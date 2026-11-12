@@ -37,8 +37,23 @@
     gap: 12px;
     overflow-y: auto;
   }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
   .header h1 { font-size: 17px; font-weight: 700; }
   .header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .status-dot {
+    font-size: 10px;
+    font-weight: 700;
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    padding: 3px 8px;
+    border-radius: 999px;
+    transition: transform 0.15s;
+  }
 
   .stats-row {
     display: grid;
@@ -175,209 +190,4 @@
   }
   .badge.timed { background: rgba(245, 158, 11, 0.15); color: var(--timed); border-color: rgba(245, 158, 11, 0.4); }
   .badge.night { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.4); }
-  .badge.load  { background: rgba(16, 185, 129, 0.15); color: var(--load); border-color: rgba(16, 185, 129, 0.4); }
-  .badge.haz   {
-    background: rgba(239, 68, 68, 0.2);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.55);
-    font-size: 10px;
-    padding: 1px 6px;
-  }
-
-  /* Map Area */
-  .map-wrap {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at center, #131f38 0%, #0b1120 100%);
-    overflow: hidden;
-  }
-  svg#uk-map { width: 100%; height: 100%; max-width: 900px; max-height: 96vh; }
-  .legend {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: rgba(30, 41, 59, 0.92);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 11px 14px;
-    font-size: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-  }
-  .legend-row { display: flex; align-items: center; gap: 8px; color: var(--muted); }
-  .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
-  .diamond-icon {
-    width: 10px; height: 10px; background: var(--load);
-    transform: rotate(45deg); display: inline-block;
-  }
-  .diamond-icon.haz {
-    background: var(--haz);
-    border: 1px solid #fbbf24;
-  }
-  .tooltip {
-    position: absolute;
-    pointer-events: none;
-    background: rgba(15, 23, 42, 0.96);
-    border: 1px solid var(--accent);
-    border-radius: 8px;
-    padding: 10px 13px;
-    font-size: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    display: none;
-    z-index: 20;
-    min-width: 185px;
-  }
-  .pin-group { cursor: pointer; }
-  .pin-label {
-    font-size: 11px;
-    font-weight: 600;
-    fill: #f8fafc;
-    paint-order: stroke;
-    stroke: #0f172a;
-    stroke-width: 3px;
-    stroke-linejoin: round;
-  }
-  .pin-label.load-lbl { fill: #6ee7b7; font-weight: 700; }
-  .pin-label.haz-lbl  { fill: #fca5a5; font-weight: 800; }
-  .pin-count {
-    font-size: 11px;
-    font-weight: 800;
-    fill: #0f172a;
-    text-anchor: middle;
-    dominant-baseline: central;
-  }
-</style>
-</head>
-<body>
-
-<div class="sidebar">
-  <div class="header">
-    <h1>UK Transport Availability Board</h1>
-    <p>Live Fleet Availability &amp; Load Proximity Matcher</p>
-  </div>
-
-  <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-val" id="total-units">0</div>
-      <div class="stat-lbl">Available Units</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="total-hubs">0</div>
-      <div class="stat-lbl">Active Hubs</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val load-stat" id="total-loads">0</div>
-      <div class="stat-lbl">Offered Loads</div>
-    </div>
-  </div>
-
-  <!-- Single Editable Availability List -->
-  <div class="input-box">
-    <label>
-      <span>1. Current Fleet Availability</span>
-      <span class="tag-pill tag-avail">Live Sync</span>
-    </label>
-    <textarea id="avail-input" placeholder="Paste or type available units...&#10;e.g.&#10;Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400&#10;Rugby x 2"></textarea>
-  </div>
-
-  <!-- Potential Load Locations -->
-  <div class="input-box">
-    <label>
-      <span>2. Potential Load Offers</span>
-      <span class="tag-pill tag-load">Supports "Haz" / "ADR"</span>
-    </label>
-    <textarea id="load-input" placeholder="e.g. Northampton Haz, Bristol x 2..."></textarea>
-  </div>
-
-  <div class="btn-row">
-    <button type="button" class="btn-primary" id="btn-update">Update Map</button>
-    <button type="button" class="btn-clear" id="btn-clear-loads">Clear Loads</button>
-    <button type="button" class="btn-clear" id="btn-clear-all">Clear All</button>
-  </div>
-
-  <div id="unmatched-box" class="unmatched"></div>
-
-  <div class="section-title" id="matches-header" style="display:none; color:#6ee7b7;">Offered Loads &amp; Nearest Available Units</div>
-  <div id="load-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-
-  <div class="section-title">Available Fleet Hubs</div>
-  <div class="hub-list" id="hub-list"></div>
-</div>
-
-<div class="map-wrap">
-  <div class="legend">
-    <div style="font-weight:700; color:#f8fafc; margin-bottom:2px;">Map Key</div>
-    <div class="legend-row"><span class="dot" style="background:#38bdf8;"></span> Available Fleet</div>
-    <div class="legend-row"><span class="dot" style="background:#f59e0b;"></span> Timed Wave (e.g. 07:00)</div>
-    <div class="legend-row"><span class="dot" style="background:#a855f7;"></span> Night Drivers</div>
-    <div class="legend-row"><span class="diamond-icon"></span> Standard Load Offer</div>
-    <div class="legend-row"><span class="diamond-icon haz"></span> ☣ Hazardous / ADR Load</div>
-    <div class="legend-row"><span style="display:inline-block;width:14px;border-top:2px dashed #10b981;"></span> Nearest Fleet Match</div>
-  </div>
-
-  <div class="tooltip" id="tooltip"></div>
-
-  <svg id="uk-map" viewBox="0 0 620 860" xmlns="http://www.w3.org/2000/svg">
-    <g stroke="#1e293b" stroke-width="1" stroke-dasharray="4 4">
-      <line x1="0" y1="200" x2="620" y2="200"/>
-      <line x1="0" y1="400" x2="620" y2="400"/>
-      <line x1="0" y1="600" x2="620" y2="600"/>
-      <line x1="0" y1="750" x2="620" y2="750"/>
-      <line x1="200" y1="0" x2="200" y2="860"/>
-      <line x1="360" y1="0" x2="360" y2="860"/>
-      <line x1="500" y1="0" x2="500" y2="860"/>
-    </g>
-
-    <!-- Great Britain Coastline -->
-    <g fill="#1e293b" stroke="#475569" stroke-width="2" stroke-linejoin="round">
-      <path d="
-        M 155,795 L 185,782 L 222,775 L 258,765 L 298,763 L 348,763 L 392,756
-        L 445,754 L 495,745 L 522,732 L 502,718 L 478,712 L 508,695 L 525,668
-        L 538,632 L 535,602 L 502,592 L 475,596 L 468,615 L 455,605 L 452,572
-        L 432,535 L 420,515 L 435,512 L 415,482 L 392,455 L 372,422 L 352,388
-        L 335,360 L 315,342 L 292,332 L 318,318 L 325,292 L 302,282 L 328,255
-        L 345,215 L 342,185 L 295,182 L 278,195 L 272,165 L 285,132 L 282,102
-        L 242,105 L 208,112 L 202,148 L 195,188 L 182,225 L 195,255 L 188,288
-        L 215,305 L 205,335 L 235,348 L 265,352 L 278,378 L 262,402 L 282,428
-        L 292,462 L 278,495 L 288,522 L 265,535 L 228,538 L 205,548 L 225,568
-        L 215,598 L 182,625 L 178,648 L 212,658 L 252,662 L 278,668 L 262,688
-        L 222,708 L 188,735 L 152,768 Z
-      "/>
-      <path d="M 358,770 L 374,768 L 378,776 L 362,779 Z"/>
-      <path d="M 206,530 L 222,526 L 225,538 L 208,540 Z"/>
-    </g>
-
-    <!-- Motorway Reference Lines -->
-    <g fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round">
-      <path d="M 442,705 L 415,650 L 385,602 L 368,555 L 352,495"/>
-      <path d="M 385,602 L 335,585 L 322,542 L 315,495 L 298,415"/>
-      <path d="M 442,705 L 395,708 L 315,695 L 265,672"/>
-      <path d="M 442,705 L 440,680 L 428,605 L 395,515 L 362,422 L 348,378"/>
-      <path d="M 335,585 L 308,655 L 262,735"/>
-    </g>
-
-    <!-- Match Connector Lines Layer -->
-    <g id="match-lines-layer"></g>
-
-    <!-- Pins Layer -->
-    <g id="pins-layer"></g>
-  </svg>
-</div>
-
-<script>
-const UK_CITIES = {
-  "wolverhampton": { name: "Wolverhampton", lat: 52.5862, lon: -2.1288, region: "West Midlands (M6/M54)" },
-  "amesbury":      { name: "Amesbury",      lat: 51.1743, lon: -1.7805, region: "South West (A303)" },
-  "deeside":       { name: "Deeside",       lat: 53.2045, lon: -3.0338, region: "North Wales / NW (A55)" },
-  "darlington":    { name: "Darlington",    lat: 54.5236, lon: -1.5594, region: "North East (A1M)" },
-  "hatfield":      { name: "Hatfield",      lat: 51.7634, lon: -0.2258, region: "Home Counties (A1M/M25)" },
-  "peterborough":  { name: "Peterborough",  lat: 52.5695, lon: -0.2405, region: "East of England (A1/A47)" },
-  "stockport":     { name: "Stockport",     lat: 53.4106, lon: -2.1575, region: "Greater Manchester (M60)" },
-  "birkenhead":    { name: "Birkenhead",    lat: 53.3934, lon: -3.0148, region: "Merseyside (M53)" },
-  "leicester":     { name: "Leicester",     lat: 52.6369, lon: -1.1398, region: "East Midlands (M1/M69)" },
-  "midlands":      { name: "Midlands Hub",  lat: 52.4862, lon: -1.8904, region: "Midlands Central (M6/M42)" },
-  "mildlands":     { name: "Midlands Hub",  lat: 52
+  .badge.load  { background: rgba(16, 185, 129, 0.15); color: var(--load); border-color: rgba(1
