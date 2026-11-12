@@ -57,7 +57,7 @@
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v10.0 SHARED</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v11.0 SHARED</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -108,8 +108,13 @@
 </div>
 
 <script>
-// PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW (keep the quotes, no trailing slash):
-var DB_URL = "https://uk-transport-availability-default-rtdb.europe-west1.firebasedatabase.app";
+// PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
+var DB_URL = "PASTE_YOUR_FIREBASE_URL_HERE";
+
+// Strip any trailing slashes automatically so /board.json never becomes //board.json
+while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
+  DB_URL = DB_URL.slice(0, -1);
+}
 
 var HUBS = {
   "wolverhampton":["Wolverhampton",52.5862,-2.1288,"West Midlands"], "amesbury":["Amesbury",51.1743,-1.7805,"South West"],
@@ -134,8 +139,8 @@ var HUBS = {
   "edinburgh":["Edinburgh",55.9533,-3.1883,"Scotland"], "glasgow":["Glasgow",55.8642,-4.2518,"Scotland"]
 };
 
-var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastRev = 0;
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v10") || "{}"); } catch (e) {}
+var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "";
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v11") || "{}"); } catch (e) {}
 
 function pt(lat, lon) { return { x: 448 + lon * 66, y: 708 - (lat - 51.5) * 96 }; }
 function miles(a, b) {
@@ -179,7 +184,7 @@ function onUserEdit() {
   pushTimer = setTimeout(function() {
     isTyping = false;
     pushToCloud();
-  }, 700);
+  }, 600);
 }
 
 function pushToCloud() {
@@ -187,46 +192,50 @@ function pushToCloud() {
     setSyncState("LOCAL ONLY", "busy", "Add Firebase URL to enable 10-crew sync");
     return;
   }
-  setSyncState("SAVING...", "busy", "Syncing update to crew...");
-  var rev = Date.now();
-  lastRev = rev;
-  var payload = {
-    avail: document.getElementById("avail").value,
-    loads: document.getElementById("loads").value,
-    rev: rev
-  };
+  setSyncState("SAVING...", "busy", "Sending update to crew...");
+  var aVal = document.getElementById("avail").value;
+  var lVal = document.getElementById("loads").value;
+  lastSnapshot = aVal + "|||" + lVal;
+
   fetch(DB_URL + "/board.json", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
+    body: JSON.stringify({ avail: aVal, loads: lVal, updated: Date.now() })
   }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
-    setSyncState("CREW LIVE", "", "Synced across all crew screens");
+    setSyncState("CREW LIVE", "", "Saved & shared with crew");
   }).catch(function(e) {
-    setSyncState("SYNC ERR", "err", "Check Firebase rules (" + e.message + ")");
+    setSyncState("SYNC ERR", "err", "Check Firebase Rules (" + e.message + ")");
   });
 }
 
 function pullFromCloud() {
   if (!DB_URL || DB_URL.indexOf("http") !== 0 || isTyping) return;
   fetch(DB_URL + "/board.json?t=" + Date.now())
-    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
     .then(function(data) {
       if (!data) {
-        setSyncState("CREW LIVE", "", "Connected (empty board)");
+        setSyncState("CREW LIVE", "", "Connected (board empty)");
         return;
       }
-      if (data.rev && data.rev !== lastRev) {
-        lastRev = data.rev;
-        var aEl = document.getElementById("avail"), lEl = document.getElementById("loads");
-        if (document.activeElement !== aEl) aEl.value = data.avail || "";
-        if (document.activeElement !== lEl) lEl.value = data.loads || "";
+      var remoteA = data.avail || "";
+      var remoteL = data.loads || "";
+      var snap = remoteA + "|||" + remoteL;
+      if (snap !== lastSnapshot) {
+        lastSnapshot = snap;
+        document.getElementById("avail").value = remoteA;
+        document.getElementById("loads").value = remoteL;
         run();
+        setSyncState("CREW LIVE", "", "Updated from crew at " + nowStamp());
+      } else {
+        setSyncState("CREW LIVE", "", "Live crew sync active");
       }
-      setSyncState("CREW LIVE", "", "Live crew sync active");
     })
-    .catch(function() {
-      setSyncState("OFFLINE", "err", "Reconnecting to crew board...");
+    .catch(function(e) {
+      setSyncState("SYNC ERR", "err", "Connection error (" + e.message + ")");
     });
 }
 
@@ -249,7 +258,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v10", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v11", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -404,7 +413,7 @@ function run() {
 
 run();
 pullFromCloud();
-setInterval(pullFromCloud, 3000);
+setInterval(pullFromCloud, 2500);
 </script>
 </body>
 </html>
