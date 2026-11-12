@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Shared + Zoom)</title>
+<title>UK Transport Availability & Load Matcher (Shared + Pinpoint Zoom)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
@@ -61,12 +61,12 @@
   .lbl { font-size: 11px; font-weight: 600; fill: #f8fafc; paint-order: stroke; stroke: #0f172a; stroke-width: 3px; }
   .lbl.g { fill: #6ee7b7; }
   .lbl.h { fill: #fca5a5; font-weight: 800; }
-  .cnt { font-size: 11px; font-weight: 800; fill: #0f172a; text-anchor: middle; dominant-baseline: central; }
+  .cnt { font-size: 10px; font-weight: 800; fill: #0f172a; text-anchor: middle; dominant-baseline: central; }
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v12.0 ZOOM</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v13.0 PINPOINT</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -103,22 +103,22 @@
     <div class="row"><span class="dia hz"></span> &#9763; Hazardous / ADR</div>
   </div>
 
-  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan</div>
+  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan (pins stay pinpoint)</div>
   <div class="zoom-controls">
-    <button type="button" class="zoom-btn" onclick="stepZoom(-0.35)" title="Zoom Out">&minus;</button>
+    <button type="button" class="zoom-btn" onclick="stepZoom(-0.4)" title="Zoom Out">&minus;</button>
     <span class="zoom-level" id="zoom-pct">100%</span>
-    <button type="button" class="zoom-btn" onclick="stepZoom(0.35)" title="Zoom In">+</button>
+    <button type="button" class="zoom-btn" onclick="stepZoom(0.4)" title="Zoom In">+</button>
     <button type="button" class="zoom-btn" onclick="resetZoom()" title="Reset View">Reset</button>
   </div>
 
   <svg id="uk-svg" viewBox="0 0 620 860">
     <g id="viewport">
-      <g fill="#1e293b" stroke="#475569" stroke-width="2" stroke-linejoin="round">
+      <g id="land-layer" fill="#1e293b" stroke="#475569" stroke-width="2" stroke-linejoin="round">
         <path d="M 155,795 L 185,782 L 222,775 L 258,765 L 298,763 L 348,763 L 392,756 L 445,754 L 495,745 L 522,732 L 502,718 L 478,712 L 508,695 L 525,668 L 538,632 L 535,602 L 502,592 L 475,596 L 468,615 L 455,605 L 452,572 L 432,535 L 420,515 L 435,512 L 415,482 L 392,455 L 372,422 L 352,388 L 335,360 L 315,342 L 292,332 L 318,318 L 325,292 L 302,282 L 328,255 L 345,215 L 342,185 L 295,182 L 278,195 L 272,165 L 285,132 L 282,102 L 242,105 L 208,112 L 202,148 L 195,188 L 182,225 L 195,255 L 188,288 L 215,305 L 205,335 L 235,348 L 265,352 L 278,378 L 262,402 L 282,428 L 292,462 L 278,495 L 288,522 L 265,535 L 228,538 L 205,548 L 225,568 L 215,598 L 182,625 L 178,648 L 212,658 L 252,662 L 278,668 L 262,688 L 222,708 L 188,735 L 152,768 Z"/>
         <path d="M 358,770 L 374,768 L 378,776 L 362,779 Z"/>
         <path d="M 206,530 L 222,526 L 225,538 L 208,540 Z"/>
       </g>
-      <g fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round">
+      <g id="road-layer" fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round">
         <path d="M 442,705 L 415,650 L 385,602 L 368,555 L 352,495 M 385,602 L 335,585 L 322,542 L 315,495 L 298,415 M 442,705 L 395,708 L 315,695 L 265,672 M 442,705 L 440,680 L 428,605 L 395,515 L 362,422 L 348,378 M 335,585 L 308,655 L 262,735"/>
       </g>
       <g id="lines"></g>
@@ -135,19 +135,42 @@ while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
   DB_URL = DB_URL.slice(0, -1);
 }
 
-// Pan & Zoom State
+// Pan & Pinpoint-Zoom State
 var zoomScale = 1, panX = 0, panY = 0, isDragging = false, dragStartX = 0, dragStartY = 0;
 
 function applyTransform() {
   var vp = document.getElementById("viewport");
   if (vp) vp.setAttribute("transform", "translate(" + panX.toFixed(1) + "," + panY.toFixed(1) + ") scale(" + zoomScale.toFixed(3) + ")");
+
+  // Keep map border and motorway strokes crisp at any zoom
+  var land = document.getElementById("land-layer");
+  var road = document.getElementById("road-layer");
+  if (land) land.setAttribute("stroke-width", (2 / zoomScale).toFixed(2));
+  if (road) road.setAttribute("stroke-width", (2 / zoomScale).toFixed(2));
+
+  // Counter-scale every pin group around its exact anchor (x, y) so pins never balloon
+  var inv = (1 / zoomScale).toFixed(4);
+  var pinNodes = document.querySelectorAll(".pin-node");
+  for (var i = 0; i < pinNodes.length; i++) {
+    var px = pinNodes[i].getAttribute("data-x");
+    var py = pinNodes[i].getAttribute("data-y");
+    pinNodes[i].setAttribute("transform", "translate(" + px + "," + py + ") scale(" + inv + ")");
+  }
+
+  // Keep connector lines slim when zoomed in
+  var connLines = document.querySelectorAll(".conn-line");
+  for (var j = 0; j < connLines.length; j++) {
+    var baseW = parseFloat(connLines[j].getAttribute("data-w") || "2");
+    connLines[j].setAttribute("stroke-width", (baseW / zoomScale).toFixed(2));
+  }
+
   var pct = document.getElementById("zoom-pct");
   if (pct) pct.textContent = Math.round(zoomScale * 100) + "%";
 }
 
 function stepZoom(delta) {
   var oldScale = zoomScale;
-  zoomScale = Math.max(0.8, Math.min(8, zoomScale + delta));
+  zoomScale = Math.max(0.8, Math.min(10, zoomScale + delta));
   var ratio = zoomScale / oldScale;
   panX = 310 - (310 - panX) * ratio;
   panY = 430 - (430 - panY) * ratio;
@@ -168,8 +191,8 @@ function resetZoom() {
     var rect = svg.getBoundingClientRect();
     var svgX = ((e.clientX - rect.left) / rect.width) * 620;
     var svgY = ((e.clientY - rect.top) / rect.height) * 860;
-    var factor = e.deltaY < 0 ? 1.22 : 0.82;
-    var newScale = Math.max(0.8, Math.min(8, zoomScale * factor));
+    var factor = e.deltaY < 0 ? 1.25 : 0.8;
+    var newScale = Math.max(0.8, Math.min(10, zoomScale * factor));
     var ratio = newScale / zoomScale;
     panX = svgX - (svgX - panX) * ratio;
     panY = svgY - (svgY - panY) * ratio;
@@ -188,10 +211,8 @@ function resetZoom() {
   window.addEventListener("mousemove", function(e) {
     if (!isDragging) return;
     var rect = svg.getBoundingClientRect();
-    var scaleFactorX = 620 / rect.width;
-    var scaleFactorY = 860 / rect.height;
-    panX += (e.clientX - dragStartX) * scaleFactorX;
-    panY += (e.clientY - dragStartY) * scaleFactorY;
+    panX += (e.clientX - dragStartX) * (620 / rect.width);
+    panY += (e.clientY - dragStartY) * (860 / rect.height);
     dragStartX = e.clientX;
     dragStartY = e.clientY;
     applyTransform();
@@ -229,7 +250,7 @@ var HUBS = {
 };
 
 var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "";
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v12") || "{}"); } catch (e) {}
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v13") || "{}"); } catch (e) {}
 
 function pt(lat, lon) { return { x: 448 + lon * 66, y: 708 - (lat - 51.5) * 96 }; }
 function miles(a, b) {
@@ -347,7 +368,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v12", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v13", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -429,20 +450,32 @@ function run() {
   document.getElementById("s-loads").textContent = lTot;
 
   for (var h = 0; h < hubs.length; h++) {
-    var hub = hubs[h], p = pt(hub.lat, hub.lon), r = Math.min(22, 10 + hub.cnt * 2.2);
+    var hub = hubs[h], p = pt(hub.lat, hub.lon);
+    // Compact pinpoint radius
+    var r = Math.min(14, 7 + hub.cnt * 1.4);
     var col = hub.night ? "#a855f7" : (hub.times.length ? "#f59e0b" : "#38bdf8");
+
+    // Pin group anchored at (0,0) and translated to (p.x, p.y) so zoom counter-scales cleanly
+    var pg = document.createElementNS(ns, "g");
+    pg.setAttribute("class", "pin-node");
+    pg.setAttribute("data-x", p.x.toFixed(2));
+    pg.setAttribute("data-y", p.y.toFixed(2));
+
     var c = document.createElementNS(ns, "circle");
-    c.setAttribute("cx", p.x); c.setAttribute("cy", p.y); c.setAttribute("r", r); c.setAttribute("fill", col); c.setAttribute("stroke", "#0f172a"); c.setAttribute("stroke-width", "2");
-    pins.appendChild(c);
+    c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
+    c.setAttribute("fill", col); c.setAttribute("stroke", "#0f172a"); c.setAttribute("stroke-width", "1.8");
+    pg.appendChild(c);
 
     var tx = document.createElementNS(ns, "text");
-    tx.setAttribute("x", p.x); tx.setAttribute("y", p.y); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
-    pins.appendChild(tx);
+    tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
+    pg.appendChild(tx);
 
     var lb = document.createElementNS(ns, "text");
-    lb.setAttribute("x", p.x + r + 5); lb.setAttribute("y", p.y + 4); lb.setAttribute("class", "lbl");
+    lb.setAttribute("x", r + 4); lb.setAttribute("y", "3.5"); lb.setAttribute("class", "lbl");
     lb.textContent = hub.name + (hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : ""));
-    pins.appendChild(lb);
+    pg.appendChild(lb);
+
+    pins.appendChild(pg);
 
     var card = document.createElement("div");
     card.className = "card";
@@ -461,26 +494,36 @@ function run() {
 
     for (var m = 0; m < near.length; m++) {
       var hp = pt(near[m].lat, near[m].lon), ln = document.createElementNS(ns, "line");
+      var baseW = m === 0 ? "2.2" : "1.1";
+      ln.setAttribute("class", "conn-line");
+      ln.setAttribute("data-w", baseW);
       ln.setAttribute("x1", lp.x); ln.setAttribute("y1", lp.y); ln.setAttribute("x2", hp.x); ln.setAttribute("y2", hp.y);
-      ln.setAttribute("stroke", col); ln.setAttribute("stroke-width", m === 0 ? "2.4" : "1.2"); ln.setAttribute("stroke-dasharray", "5 4"); ln.setAttribute("opacity", m === 0 ? "0.9" : "0.45");
+      ln.setAttribute("stroke", col); ln.setAttribute("stroke-width", baseW); ln.setAttribute("stroke-dasharray", "4 3"); ln.setAttribute("opacity", m === 0 ? "0.9" : "0.45");
       lines.appendChild(ln);
     }
 
-    var sz = ld.haz ? 15 : 13, poly = document.createElementNS(ns, "polygon");
-    poly.setAttribute("points", lp.x + "," + (lp.y - sz) + " " + (lp.x + sz) + "," + lp.y + " " + lp.x + "," + (lp.y + sz) + " " + (lp.x - sz) + "," + lp.y);
-    poly.setAttribute("fill", col); poly.setAttribute("stroke", ld.haz ? "#fbbf24" : "#fff"); poly.setAttribute("stroke-width", "2");
-    pins.appendChild(poly);
+    var lg = document.createElementNS(ns, "g");
+    lg.setAttribute("class", "pin-node");
+    lg.setAttribute("data-x", lp.x.toFixed(2));
+    lg.setAttribute("data-y", lp.y.toFixed(2));
+
+    var sz = ld.haz ? 11 : 9.5, poly = document.createElementNS(ns, "polygon");
+    poly.setAttribute("points", "0," + (-sz) + " " + sz + ",0 0," + sz + " " + (-sz) + ",0");
+    poly.setAttribute("fill", col); poly.setAttribute("stroke", ld.haz ? "#fbbf24" : "#fff"); poly.setAttribute("stroke-width", "1.8");
+    lg.appendChild(poly);
 
     var ltx = document.createElementNS(ns, "text");
-    ltx.setAttribute("x", lp.x); ltx.setAttribute("y", lp.y); ltx.setAttribute("class", "cnt");
+    ltx.setAttribute("x", "0"); ltx.setAttribute("y", "0"); ltx.setAttribute("class", "cnt");
     if (ld.haz) ltx.setAttribute("fill", "#fff");
     ltx.textContent = ld.cnt;
-    pins.appendChild(ltx);
+    lg.appendChild(ltx);
 
     var llb = document.createElementNS(ns, "text");
-    llb.setAttribute("x", lp.x + 18); llb.setAttribute("y", lp.y + 4); llb.setAttribute("class", ld.haz ? "lbl h" : "lbl g");
+    llb.setAttribute("x", sz + 5); llb.setAttribute("y", "3.5"); llb.setAttribute("class", ld.haz ? "lbl h" : "lbl g");
     llb.textContent = (ld.haz ? "HAZ: " : "LOAD: ") + ld.name;
-    pins.appendChild(llb);
+    lg.appendChild(llb);
+
+    pins.appendChild(lg);
 
     var lcard = document.createElement("div");
     lcard.className = ld.haz ? "card ld hz" : "card ld";
@@ -488,6 +531,9 @@ function run() {
     lcard.innerHTML = '<div><div class="card-title" style="color:' + (ld.haz ? "#fca5a5" : "#6ee7b7") + ';">' + ld.name + (ld.haz ? '<span class="tag h">&#9763; HAZ</span>' : '') + '</div><div class="card-sub" style="color:#cbd5e1;">' + mTxt + '</div></div><span class="tag g">' + ld.cnt + 'x</span>';
     lList.appendChild(lcard);
   }
+
+  // Re-apply current zoom counter-scale so newly rendered pins match current zoom level
+  applyTransform();
 
   var msg = document.getElementById("msg");
   if (miss.length) { msg.style.display = "block"; msg.textContent = "Not found: " + miss.join(", "); }
