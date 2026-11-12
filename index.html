@@ -3,285 +3,85 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher v4</title>
+<title>UK Transport Availability Board</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #0f172a;
-    color: #f8fafc;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-  .sidebar {
-    width: 410px;
-    background: #1e293b;
-    border-right: 1px solid #334155;
-    display: flex;
-    flex-direction: column;
-    padding: 16px;
-    gap: 12px;
-    overflow-y: auto;
-  }
-  .header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
+  .sidebar { width: 400px; background: #1e293b; border-right: 1px solid #334155; display: flex; flex-direction: column; padding: 16px; gap: 11px; overflow-y: auto; }
+  .header { display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 17px; font-weight: 700; }
-  .header p { font-size: 12px; color: #94a3b8; margin-top: 2px; }
-  .status-dot {
-    font-size: 10px;
-    font-weight: 700;
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.15);
-    border: 1px solid rgba(16, 185, 129, 0.4);
-    padding: 3px 8px;
-    border-radius: 999px;
-  }
-  .stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
-  }
-  .stat-card {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 8px;
-    text-align: center;
-  }
+  .status-dot { font-size: 10px; font-weight: 700; color: #10b981; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 3px 8px; border-radius: 999px; }
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .stat-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px; text-align: center; }
   .stat-val { font-size: 19px; font-weight: 700; color: #38bdf8; }
   .stat-val.load-stat { color: #10b981; }
   .stat-lbl { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-
   .input-box { display: flex; flex-direction: column; gap: 5px; }
-  .input-box label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #f8fafc;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  .tag-pill {
-    font-size: 10px;
-    padding: 2px 7px;
-    border-radius: 999px;
-    font-weight: 700;
-  }
-  .tag-avail { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-  .tag-load  { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-
-  textarea {
-    width: 100%;
-    background: #0f172a;
-    color: #f8fafc;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 9px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    line-height: 1.4;
-    resize: vertical;
-  }
-  textarea#avail-input { height: 145px; }
-  textarea#load-input  { height: 68px; border-color: rgba(16, 185, 129, 0.45); }
+  .input-box label { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; }
+  .tag-pill { font-size: 10px; padding: 2px 7px; border-radius: 999px; font-weight: 700; }
+  .tag-avail { background: rgba(56,189,248,0.15); color: #38bdf8; }
+  .tag-load { background: rgba(16,185,129,0.15); color: #10b981; }
+  textarea { width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 8px; padding: 9px; font-family: monospace; font-size: 12px; line-height: 1.4; resize: vertical; }
+  #avail-input { height: 140px; }
+  #load-input { height: 65px; border-color: rgba(16,185,129,0.45); }
   textarea:focus { outline: none; border-color: #38bdf8; }
-  textarea#load-input:focus { border-color: #10b981; }
-
   .btn-row { display: flex; gap: 8px; }
-  button {
-    cursor: pointer;
-    border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
-    font-size: 12px;
-    font-weight: 600;
-  }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 8px 12px; font-size: 12px; font-weight: 600; }
   .btn-primary { background: #38bdf8; color: #0f172a; flex: 1; }
-  .btn-primary:hover { filter: brightness(1.1); }
   .btn-clear { background: #263349; color: #94a3b8; border: 1px solid #334155; }
-  .btn-clear:hover { color: #f8fafc; border-color: #94a3b8; }
-
-  .unmatched {
-    font-size: 11px;
-    color: #fca5a5;
-    background: rgba(239, 68, 68, 0.12);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    padding: 6px 9px;
-    border-radius: 6px;
-    display: none;
-  }
-  .section-title {
-    font-size: 11px;
-    font-weight: 700;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-top: 2px;
-  }
-  .hub-list {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    overflow-y: auto;
-    flex: 1;
-    padding-right: 2px;
-  }
-  .empty-state {
-    font-size: 12px;
-    color: #94a3b8;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px dashed #334155;
-    border-radius: 7px;
-    padding: 14px 12px;
-    text-align: center;
-    line-height: 1.45;
-  }
-  .hub-item {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 7px;
-    padding: 8px 11px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-  }
+  .btn-clear:hover { color: #f8fafc; }
+  .unmatched { font-size: 11px; color: #fca5a5; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); padding: 6px 9px; border-radius: 6px; display: none; }
+  .section-title { font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; }
+  .hub-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; flex: 1; }
+  .empty-state { font-size: 12px; color: #94a3b8; background: rgba(15,23,42,0.5); border: 1px dashed #334155; border-radius: 7px; padding: 14px; text-align: center; line-height: 1.45; }
+  .hub-item { background: #0f172a; border: 1px solid #334155; border-radius: 7px; padding: 8px 11px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .hub-item.load-card { border-left: 3px solid #10b981; }
-  .hub-item.haz-card { border-left: 3px solid #ef4444; background: rgba(239, 68, 68, 0.08); }
+  .hub-item.haz-card { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.08); }
   .hub-name { font-size: 13px; font-weight: 600; }
   .hub-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-  .match-line { font-size: 11px; color: #6ee7b7; margin-top: 3px; font-weight: 500; }
-
-  .badge {
-    background: rgba(56, 189, 248, 0.15);
-    color: #38bdf8;
-    border: 1px solid rgba(56, 189, 248, 0.4);
-    font-weight: 700;
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 999px;
-    white-space: nowrap;
-  }
-  .badge.timed { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
-  .badge.night { background: rgba(168, 85, 247, 0.15); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.4); }
-  .badge.load  { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
-  .badge.haz   {
-    background: rgba(239, 68, 68, 0.25);
-    color: #fca5a5;
-    border-color: rgba(239, 68, 68, 0.6);
-    font-size: 10px;
-    padding: 1px 6px;
-    margin-left: 4px;
-  }
-
-  .map-wrap {
-    flex: 1;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at center, #131f38 0%, #0b1120 100%);
-    overflow: hidden;
-  }
+  .match-line { font-size: 11px; color: #6ee7b7; margin-top: 3px; }
+  .badge { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.4); font-weight: 700; font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .badge.timed { background: rgba(245,158,11,0.15); color: #f59e0b; border-color: rgba(245,158,11,0.4); }
+  .badge.night { background: rgba(168,85,247,0.15); color: #d8b4fe; border-color: rgba(168,85,247,0.4); }
+  .badge.load { background: rgba(16,185,129,0.15); color: #10b981; border-color: rgba(16,185,129,0.4); }
+  .badge.haz { background: rgba(239,68,68,0.25); color: #fca5a5; border-color: rgba(239,68,68,0.6); font-size: 10px; padding: 1px 6px; margin-left: 4px; }
+  .map-wrap { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #0b1120; overflow: hidden; }
   svg#uk-map { width: 100%; height: 100%; max-width: 900px; max-height: 96vh; }
-  .legend {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: rgba(30, 41, 59, 0.92);
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 11px 14px;
-    font-size: 12px;
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-  }
+  .legend { position: absolute; top: 16px; right: 16px; background: rgba(30,41,59,0.92); border: 1px solid #334155; border-radius: 8px; padding: 11px 14px; font-size: 12px; display: flex; flex-direction: column; gap: 7px; }
   .legend-row { display: flex; align-items: center; gap: 8px; color: #94a3b8; }
   .dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
-  .diamond-icon {
-    width: 10px; height: 10px; background: #10b981;
-    transform: rotate(45deg); display: inline-block;
-  }
+  .diamond-icon { width: 10px; height: 10px; background: #10b981; transform: rotate(45deg); display: inline-block; }
   .diamond-icon.haz { background: #ef4444; border: 1px solid #fbbf24; }
-  .tooltip {
-    position: absolute;
-    pointer-events: none;
-    background: rgba(15, 23, 42, 0.96);
-    border: 1px solid #38bdf8;
-    border-radius: 8px;
-    padding: 10px 13px;
-    font-size: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    display: none;
-    z-index: 20;
-    min-width: 185px;
-  }
+  .tooltip { position: absolute; pointer-events: none; background: rgba(15,23,42,0.96); border: 1px solid #38bdf8; border-radius: 8px; padding: 10px 13px; font-size: 12px; display: none; z-index: 20; min-width: 185px; }
   .pin-group { cursor: pointer; }
-  .pin-label {
-    font-size: 11px;
-    font-weight: 600;
-    fill: #f8fafc;
-    paint-order: stroke;
-    stroke: #0f172a;
-    stroke-width: 3px;
-    stroke-linejoin: round;
-  }
+  .pin-label { font-size: 11px; font-weight: 600; fill: #f8fafc; paint-order: stroke; stroke: #0f172a; stroke-width: 3px; stroke-linejoin: round; }
   .pin-label.load-lbl { fill: #6ee7b7; font-weight: 700; }
-  .pin-label.haz-lbl  { fill: #fca5a5; font-weight: 800; }
-  .pin-count {
-    font-size: 11px;
-    font-weight: 800;
-    fill: #0f172a;
-    text-anchor: middle;
-    dominant-baseline: central;
-  }
+  .pin-label.haz-lbl { fill: #fca5a5; font-weight: 800; }
+  .pin-count { font-size: 11px; font-weight: 800; fill: #0f172a; text-anchor: middle; dominant-baseline: central; }
 </style>
 </head>
 <body>
 
 <div class="sidebar">
   <div class="header">
-    <div>
-      <h1>UK Transport Availability</h1>
-      <p>Live Fleet &amp; Load Matcher (v4.0)</p>
-    </div>
-    <span class="status-dot" id="live-status">v4.0 READY</span>
+    <h1>UK Transport Availability</h1>
+    <span class="status-dot" id="live-status">v5.0 LIVE</span>
   </div>
 
   <div class="stats-row">
-    <div class="stat-card">
-      <div class="stat-val" id="total-units">0</div>
-      <div class="stat-lbl">Available Units</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val" id="total-hubs">0</div>
-      <div class="stat-lbl">Active Hubs</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-val load-stat" id="total-loads">0</div>
-      <div class="stat-lbl">Offered Loads</div>
-    </div>
+    <div class="stat-card"><div class="stat-val" id="total-units">0</div><div class="stat-lbl">Available Units</div></div>
+    <div class="stat-card"><div class="stat-val" id="total-hubs">0</div><div class="stat-lbl">Active Hubs</div></div>
+    <div class="stat-card"><div class="stat-val load-stat" id="total-loads">0</div><div class="stat-lbl">Offered Loads</div></div>
   </div>
 
   <div class="input-box">
-    <label>
-      <span>1. Current Fleet Availability</span>
-      <span class="tag-pill tag-avail">Live Sync</span>
-    </label>
-    <textarea id="avail-input" oninput="updateBoard()" onkeyup="updateBoard()" placeholder="Paste or type available units...&#10;e.g.&#10;Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400&#10;Rugby x 2"></textarea>
+    <label><span>1. Current Fleet Availability</span><span class="tag-pill tag-avail">Live Sync</span></label>
+    <textarea id="avail-input" oninput="updateBoard()" placeholder="e.g. Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400"></textarea>
   </div>
 
   <div class="input-box">
-    <label>
-      <span>2. Potential Load Offers</span>
-      <span class="tag-pill tag-load">Supports "Haz" / "ADR"</span>
-    </label>
-    <textarea id="load-input" oninput="updateBoard()" onkeyup="updateBoard()" placeholder="e.g. Northampton Haz, Bristol x 2..."></textarea>
+    <label><span>2. Potential Load Offers</span><span class="tag-pill tag-load">Supports "Haz" / "ADR"</span></label>
+    <textarea id="load-input" oninput="updateBoard()" placeholder="e.g. Northampton Haz, Bristol x 2"></textarea>
   </div>
 
   <div class="btn-row">
@@ -291,44 +91,28 @@
   </div>
 
   <div id="unmatched-box" class="unmatched"></div>
-
   <div class="section-title" id="matches-header" style="display:none; color:#6ee7b7;">Offered Loads &amp; Nearest Available Units</div>
   <div id="load-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-
   <div class="section-title">Available Fleet Hubs</div>
   <div class="hub-list" id="hub-list"></div>
 </div>
 
 <div class="map-wrap">
   <div class="legend">
-    <div style="font-weight:700; color:#f8fafc; margin-bottom:2px;">Map Key</div>
+    <div style="font-weight:700; color:#f8fafc;">Map Key</div>
     <div class="legend-row"><span class="dot" style="background:#38bdf8;"></span> Available Fleet</div>
-    <div class="legend-row"><span class="dot" style="background:#f59e0b;"></span> Timed Wave (e.g. 07:00)</div>
+    <div class="legend-row"><span class="dot" style="background:#f59e0b;"></span> Timed Wave</div>
     <div class="legend-row"><span class="dot" style="background:#a855f7;"></span> Night Drivers</div>
-    <div class="legend-row"><span class="diamond-icon"></span> Standard Load Offer</div>
-    <div class="legend-row"><span class="diamond-icon haz"></span> &#9763; Hazardous / ADR Load</div>
-    <div class="legend-row"><span style="display:inline-block;width:14px;border-top:2px dashed #10b981;"></span> Nearest Fleet Match</div>
+    <div class="legend-row"><span class="diamond-icon"></span> Standard Load</div>
+    <div class="legend-row"><span class="diamond-icon haz"></span> &#9763; Hazardous / ADR</div>
   </div>
-
   <div class="tooltip" id="tooltip"></div>
-
   <svg id="uk-map" viewBox="0 0 620 860" xmlns="http://www.w3.org/2000/svg">
-    <g stroke="#1e293b" stroke-width="1" stroke-dasharray="4 4">
-      <line x1="0" y1="200" x2="620" y2="200"/>
-      <line x1="0" y1="400" x2="620" y2="400"/>
-      <line x1="0" y1="600" x2="620" y2="600"/>
-      <line x1="0" y1="750" x2="620" y2="750"/>
-      <line x1="200" y1="0" x2="200" y2="860"/>
-      <line x1="360" y1="0" x2="360" y2="860"/>
-      <line x1="500" y1="0" x2="500" y2="860"/>
-    </g>
-
     <g fill="#1e293b" stroke="#475569" stroke-width="2" stroke-linejoin="round">
       <path d="M 155,795 L 185,782 L 222,775 L 258,765 L 298,763 L 348,763 L 392,756 L 445,754 L 495,745 L 522,732 L 502,718 L 478,712 L 508,695 L 525,668 L 538,632 L 535,602 L 502,592 L 475,596 L 468,615 L 455,605 L 452,572 L 432,535 L 420,515 L 435,512 L 415,482 L 392,455 L 372,422 L 352,388 L 335,360 L 315,342 L 292,332 L 318,318 L 325,292 L 302,282 L 328,255 L 345,215 L 342,185 L 295,182 L 278,195 L 272,165 L 285,132 L 282,102 L 242,105 L 208,112 L 202,148 L 195,188 L 182,225 L 195,255 L 188,288 L 215,305 L 205,335 L 235,348 L 265,352 L 278,378 L 262,402 L 282,428 L 292,462 L 278,495 L 288,522 L 265,535 L 228,538 L 205,548 L 225,568 L 215,598 L 182,625 L 178,648 L 212,658 L 252,662 L 278,668 L 262,688 L 222,708 L 188,735 L 152,768 Z"/>
       <path d="M 358,770 L 374,768 L 378,776 L 362,779 Z"/>
       <path d="M 206,530 L 222,526 L 225,538 L 208,540 Z"/>
     </g>
-
     <g fill="none" stroke="#334155" stroke-width="2" stroke-linecap="round">
       <path d="M 442,705 L 415,650 L 385,602 L 368,555 L 352,495"/>
       <path d="M 385,602 L 335,585 L 322,542 L 315,495 L 298,415"/>
@@ -336,7 +120,6 @@
       <path d="M 442,705 L 440,680 L 428,605 L 395,515 L 362,422 L 348,378"/>
       <path d="M 335,585 L 308,655 L 262,735"/>
     </g>
-
     <g id="match-lines-layer"></g>
     <g id="pins-layer"></g>
   </svg>
@@ -345,51 +128,310 @@
 <script>
 var UK_CITIES = {
   "wolverhampton": { name: "Wolverhampton", lat: 52.5862, lon: -2.1288, region: "West Midlands (M6/M54)" },
-  "amesbury":      { name: "Amesbury",      lat: 51.1743, lon: -1.7805, region: "South West (A303)" },
-  "deeside":       { name: "Deeside",       lat: 53.2045, lon: -3.0338, region: "North Wales / NW (A55)" },
-  "darlington":    { name: "Darlington",    lat: 54.5236, lon: -1.5594, region: "North East (A1M)" },
-  "hatfield":      { name: "Hatfield",      lat: 51.7634, lon: -0.2258, region: "Home Counties (A1M/M25)" },
-  "peterborough":  { name: "Peterborough",  lat: 52.5695, lon: -0.2405, region: "East of England (A1/A47)" },
-  "stockport":     { name: "Stockport",     lat: 53.4106, lon: -2.1575, region: "Greater Manchester (M60)" },
-  "birkenhead":    { name: "Birkenhead",    lat: 53.3934, lon: -3.0148, region: "Merseyside (M53)" },
-  "leicester":     { name: "Leicester",     lat: 52.6369, lon: -1.1398, region: "East Midlands (M1/M69)" },
-  "midlands":      { name: "Midlands Hub",  lat: 52.4862, lon: -1.8904, region: "Midlands Central (M6/M42)" },
-  "mildlands":     { name: "Midlands Hub",  lat: 52.4862, lon: -1.8904, region: "Midlands Central (M6/M42)" },
-  "birmingham":    { name: "Birmingham",    lat: 52.4862, lon: -1.8904, region: "West Midlands (M6/M42)" },
-  "rugby":         { name: "Rugby",         lat: 52.3709, lon: -1.2650, region: "Golden Triangle (M1/M6)" },
-  "stoke":         { name: "Stoke-on-Trent",lat: 53.0027, lon: -2.1794, region: "North Midlands (M6/A50)" },
-  "reading":       { name: "Reading",       lat: 51.4543, lon: -0.9781, region: "Thames Valley (M4)" },
-  "northampton":   { name: "Northampton",   lat: 52.2405, lon: -0.9027, region: "Midlands (M1)" },
-  "london":        { name: "London",        lat: 51.5074, lon: -0.1278, region: "Greater London (M25)" },
-  "manchester":    { name: "Manchester",    lat: 53.4808, lon: -2.2426, region: "North West (M60/M62)" },
-  "leeds":         { name: "Leeds",         lat: 53.8008, lon: -1.5491, region: "Yorkshire (M1/M62)" },
-  "sheffield":     { name: "Sheffield",     lat: 53.3811, lon: -1.4701, region: "South Yorkshire (M1)" },
-  "nottingham":    { name: "Nottingham",    lat: 52.9548, lon: -1.1581, region: "East Midlands (M1)" },
-  "derby":         { name: "Derby",         lat: 52.9225, lon: -1.4746, region: "East Midlands (A50/M1)" },
-  "coventry":      { name: "Coventry",      lat: 52.4068, lon: -1.5197, region: "West Midlands (M6/M69)" },
+  "amesbury": { name: "Amesbury", lat: 51.1743, lon: -1.7805, region: "South West (A303)" },
+  "deeside": { name: "Deeside", lat: 53.2045, lon: -3.0338, region: "North Wales / NW (A55)" },
+  "darlington": { name: "Darlington", lat: 54.5236, lon: -1.5594, region: "North East (A1M)" },
+  "hatfield": { name: "Hatfield", lat: 51.7634, lon: -0.2258, region: "Home Counties (A1M/M25)" },
+  "peterborough": { name: "Peterborough", lat: 52.5695, lon: -0.2405, region: "East of England (A1/A47)" },
+  "stockport": { name: "Stockport", lat: 53.4106, lon: -2.1575, region: "Greater Manchester (M60)" },
+  "birkenhead": { name: "Birkenhead", lat: 53.3934, lon: -3.0148, region: "Merseyside (M53)" },
+  "leicester": { name: "Leicester", lat: 52.6369, lon: -1.1398, region: "East Midlands (M1/M69)" },
+  "midlands": { name: "Midlands Hub", lat: 52.4862, lon: -1.8904, region: "Midlands Central (M6/M42)" },
+  "mildlands": { name: "Midlands Hub", lat: 52.4862, lon: -1.8904, region: "Midlands Central (M6/M42)" },
+  "birmingham": { name: "Birmingham", lat: 52.4862, lon: -1.8904, region: "West Midlands (M6/M42)" },
+  "rugby": { name: "Rugby", lat: 52.3709, lon: -1.2650, region: "Golden Triangle (M1/M6)" },
+  "stoke": { name: "Stoke-on-Trent", lat: 53.0027, lon: -2.1794, region: "North Midlands (M6/A50)" },
+  "reading": { name: "Reading", lat: 51.4543, lon: -0.9781, region: "Thames Valley (M4)" },
+  "northampton": { name: "Northampton", lat: 52.2405, lon: -0.9027, region: "Midlands (M1)" },
+  "london": { name: "London", lat: 51.5074, lon: -0.1278, region: "Greater London (M25)" },
+  "manchester": { name: "Manchester", lat: 53.4808, lon: -2.2426, region: "North West (M60/M62)" },
+  "leeds": { name: "Leeds", lat: 53.8008, lon: -1.5491, region: "Yorkshire (M1/M62)" },
+  "sheffield": { name: "Sheffield", lat: 53.3811, lon: -1.4701, region: "South Yorkshire (M1)" },
+  "nottingham": { name: "Nottingham", lat: 52.9548, lon: -1.1581, region: "East Midlands (M1)" },
+  "derby": { name: "Derby", lat: 52.9225, lon: -1.4746, region: "East Midlands (A50/M1)" },
+  "coventry": { name: "Coventry", lat: 52.4068, lon: -1.5197, region: "West Midlands (M6/M69)" },
   "milton keynes": { name: "Milton Keynes", lat: 52.0406, lon: -0.7594, region: "South Midlands (M1)" },
-  "bedford":       { name: "Bedford",       lat: 52.1360, lon: -0.4667, region: "East / Midlands (A421/A1)" },
-  "kettering":     { name: "Kettering",     lat: 52.3931, lon: -0.7229, region: "Northamptonshire (A14)" },
-  "corby":         { name: "Corby",         lat: 52.4877, lon: -0.6858, region: "Northamptonshire (A43/A14)" },
-  "daventry":      { name: "Daventry",      lat: 52.2587, lon: -1.1628, region: "Golden Triangle (M1/A45)" },
-  "tamworth":      { name: "Tamworth",      lat: 52.6340, lon: -1.6959, region: "Midlands (M42/A5)" },
-  "cannock":       { name: "Cannock",       lat: 52.6907, lon: -2.0305, region: "Staffordshire (M6/M6 Toll)" },
-  "bristol":       { name: "Bristol",       lat: 51.4545, lon: -2.5879, region: "South West (M4/M5)" },
-  "swindon":       { name: "Swindon",       lat: 51.5558, lon: -1.7797, region: "South West (M4)" },
-  "southampton":   { name: "Southampton",   lat: 50.9097, lon: -1.4044, region: "South Coast (M3/M27)" },
-  "portsmouth":    { name: "Portsmouth",    lat: 50.8198, lon: -1.0880, region: "South Coast (A3/M27)" },
-  "exeter":        { name: "Exeter",        lat: 50.7184, lon: -3.5339, region: "South West (M5)" },
-  "plymouth":      { name: "Plymouth",      lat: 50.3755, lon: -4.1427, region: "Devon (A38)" },
-  "cardiff":       { name: "Cardiff",       lat: 51.4816, lon: -3.1791, region: "South Wales (M4)" },
-  "newport":       { name: "Newport",       lat: 51.5842, lon: -2.9977, region: "South Wales (M4)" },
-  "swansea":       { name: "Swansea",       lat: 51.6214, lon: -3.9436, region: "South Wales (M4)" },
-  "liverpool":     { name: "Liverpool",     lat: 53.4084, lon: -2.9916, region: "Merseyside (M62)" },
-  "warrington":    { name: "Warrington",    lat: 53.3900, lon: -2.5970, region: "North West (M6/M62)" },
-  "preston":       { name: "Preston",       lat: 53.7632, lon: -2.7031, region: "Lancashire (M6)" },
-  "carlisle":      { name: "Carlisle",      lat: 54.8925, lon: -2.9329, region: "Cumbria (M6)" },
-  "newcastle":     { name: "Newcastle",     lat: 54.9783, lon: -1.6178, region: "North East (A1)" },
-  "sunderland":    { name: "Sunderland",    lat: 54.9069, lon: -1.3838, region: "North East (A19)" },
+  "bedford": { name: "Bedford", lat: 52.1360, lon: -0.4667, region: "East / Midlands (A421/A1)" },
+  "kettering": { name: "Kettering", lat: 52.3931, lon: -0.7229, region: "Northamptonshire (A14)" },
+  "corby": { name: "Corby", lat: 52.4877, lon: -0.6858, region: "Northamptonshire (A43/A14)" },
+  "daventry": { name: "Daventry", lat: 52.2587, lon: -1.1628, region: "Golden Triangle (M1/A45)" },
+  "tamworth": { name: "Tamworth", lat: 52.6340, lon: -1.6959, region: "Midlands (M42/A5)" },
+  "cannock": { name: "Cannock", lat: 52.6907, lon: -2.0305, region: "Staffordshire (M6/M6 Toll)" },
+  "bristol": { name: "Bristol", lat: 51.4545, lon: -2.5879, region: "South West (M4/M5)" },
+  "swindon": { name: "Swindon", lat: 51.5558, lon: -1.7797, region: "South West (M4)" },
+  "southampton": { name: "Southampton", lat: 50.9097, lon: -1.4044, region: "South Coast (M3/M27)" },
+  "portsmouth": { name: "Portsmouth", lat: 50.8198, lon: -1.0880, region: "South Coast (A3/M27)" },
+  "exeter": { name: "Exeter", lat: 50.7184, lon: -3.5339, region: "South West (M5)" },
+  "plymouth": { name: "Plymouth", lat: 50.3755, lon: -4.1427, region: "Devon (A38)" },
+  "cardiff": { name: "Cardiff", lat: 51.4816, lon: -3.1791, region: "South Wales (M4)" },
+  "newport": { name: "Newport", lat: 51.5842, lon: -2.9977, region: "South Wales (M4)" },
+  "swansea": { name: "Swansea", lat: 51.6214, lon: -3.9436, region: "South Wales (M4)" },
+  "liverpool": { name: "Liverpool", lat: 53.4084, lon: -2.9916, region: "Merseyside (M62)" },
+  "warrington": { name: "Warrington", lat: 53.3900, lon: -2.5970, region: "North West (M6/M62)" },
+  "preston": { name: "Preston", lat: 53.7632, lon: -2.7031, region: "Lancashire (M6)" },
+  "carlisle": { name: "Carlisle", lat: 54.8925, lon: -2.9329, region: "Cumbria (M6)" },
+  "newcastle": { name: "Newcastle", lat: 54.9783, lon: -1.6178, region: "North East (A1)" },
+  "sunderland": { name: "Sunderland", lat: 54.9069, lon: -1.3838, region: "North East (A19)" },
   "middlesbrough": { name: "Middlesbrough", lat: 54.5742, lon: -1.2350, region: "Teesside (A19/A66)" },
-  "york":          { name: "York",          lat: 53.9600, lon: -1.0873, region: "North Yorkshire (A64)" },
-  "hull":          { name: "Hull",          lat: 53.7676, lon: -0.3274, region: "East Yorkshire (M62)" },
-  "doncaster":
+  "york": { name: "York", lat: 53.9600, lon: -1.0873, region: "North Yorkshire (A64)" },
+  "hull": { name: "Hull", lat: 53.7676, lon: -0.3274, region: "East Yorkshire (M62)" },
+  "doncaster": { name: "Doncaster", lat: 53.5228, lon: -1.1285, region: "South Yorkshire (A1M/M18)" },
+  "norwich": { name: "Norwich", lat: 52.6309, lon: 1.2974, region: "East Anglia (A11)" },
+  "ipswich": { name: "Ipswich", lat: 52.0567, lon: 1.1482, region: "Suffolk (A14/A12)" },
+  "felixstowe": { name: "Felixstowe", lat: 51.9617, lon: 1.3513, region: "Suffolk Port (A14)" },
+  "cambridge": { name: "Cambridge", lat: 52.2053, lon: 0.1218, region: "East (M11/A14)" },
+  "luton": { name: "Luton", lat: 51.8787, lon: -0.4200, region: "Home Counties (M1)" },
+  "oxford": { name: "Oxford", lat: 51.7520, lon: -1.2577, region: "Thames Valley (A34/M40)" },
+  "gloucester": { name: "Gloucester", lat: 51.8642, lon: -2.2382, region: "South West (M5)" },
+  "worcester": { name: "Worcester", lat: 52.1936, lon: -2.2216, region: "West Midlands (M5)" },
+  "telford": { name: "Telford", lat: 52.6784, lon: -2.4453, region: "Shropshire (M54)" },
+  "crewe": { name: "Crewe", lat: 53.0998, lon: -2.4401, region: "Cheshire (M6)" },
+  "chester": { name: "Chester", lat: 53.1930, lon: -2.8931, region: "Cheshire (M53/A55)" },
+  "edinburgh": { name: "Edinburgh", lat: 55.9533, lon: -3.1883, region: "Central Scotland (M8)" },
+  "glasgow": { name: "Glasgow", lat: 55.8642, lon: -4.2518, region: "Central Scotland (M8/M74)" },
+  "aberdeen": { name: "Aberdeen", lat: 57.1497, lon: -2.0943, region: "North East Scotland (A90)" },
+  "dundee": { name: "Dundee", lat: 56.4620, lon: -2.9707, region: "East Scotland (A90)" }
+};
+
+function project(lat, lon) {
+  return { x: 448 + (lon * 66), y: 708 - ((lat - 51.5) * 96) };
+}
+
+function estimateRoadMiles(lat1, lon1, lat2, lon2) {
+  var R = 3958.8;
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var s1 = Math.sin(dLat / 2);
+  var s2 = Math.sin(dLon / 2);
+  var a = (s1 * s1) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * (s2 * s2);
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 1.22);
+}
+
+function parseEntry(rawEntry, unmatchedCollector) {
+  var normalized = rawEntry.replace(/([a-z])([A-Z])/g, "$1\n$2");
+  var lines = normalized.split(/\r?\n/);
+  var results = [];
+  var cityKeys = Object.keys(UK_CITIES);
+
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var lower = line.toLowerCase();
+    var timeMatches = line.match(/\b([01]?\d|2[0-3]):?[0-5]\d\b/g) || [];
+    var formattedTimes = [];
+    for (var t = 0; t < timeMatches.length; t++) {
+      var tm = timeMatches[t];
+      formattedTimes.push(tm.indexOf(":") !== -1 ? tm : tm.slice(0, 2) + ":" + tm.slice(2));
+    }
+    var isNight = /\bnight\b/i.test(line);
+    var isHaz = /\b(haz|hazardous|adr)\b/i.test(line);
+    var count = 1;
+    var prefixMult = lower.match(/^(\d+)\s*x\b/);
+    var suffixMult = lower.match(/\bx\s*(\d+)\b/);
+    if (prefixMult) count = parseInt(prefixMult[1], 10);
+    else if (suffixMult) count = parseInt(suffixMult[1], 10);
+    else if (formattedTimes.length > 1) count = formattedTimes.length;
+
+    var matchedKey = null;
+    for (var k = 0; k < cityKeys.length; k++) {
+      var regex = new RegExp("\\b" + cityKeys[k] + "s?\\b", "i");
+      if (regex.test(lower)) { matchedKey = cityKeys[k]; break; }
+    }
+
+    if (matchedKey) {
+      var city = UK_CITIES[matchedKey];
+      results.push({ name: city.name, lat: city.lat, lon: city.lon, region: city.region, count: count, times: formattedTimes, isNight: isNight, isHaz: isHaz });
+    } else if (!/^\d{3,4}$/.test(line)) {
+      unmatchedCollector.push(line);
+    }
+  }
+  return results;
+}
+
+function mergeItems(items) {
+  var map = {};
+  for (var i = 0; i < items.length; i++) {
+    var item = items[i];
+    if (!map[item.name]) {
+      map[item.name] = { name: item.name, lat: item.lat, lon: item.lon, region: item.region, count: item.count, times: item.times.slice(), isNight: item.isNight, isHaz: item.isHaz };
+    } else {
+      map[item.name].count += item.count;
+      if (item.isNight) map[item.name].isNight = true;
+      if (item.isHaz) map[item.name].isHaz = true;
+      for (var t = 0; t < item.times.length; t++) {
+        if (map[item.name].times.indexOf(item.times[t]) === -1) map[item.name].times.push(item.times[t]);
+      }
+    }
+  }
+  var out = [];
+  for (var k in map) { if (map.hasOwnProperty(k)) out.push(map[k]); }
+  return out;
+}
+
+function clearLoads() { document.getElementById("load-input").value = ""; updateBoard(); }
+function clearAll() { document.getElementById("avail-input").value = ""; document.getElementById("load-input").value = ""; updateBoard(); }
+
+function updateBoard() {
+  var availRaw = document.getElementById("avail-input").value;
+  var loadRaw = document.getElementById("load-input").value;
+  var unmatched = [];
+  var hubs = mergeItems(parseEntry(availRaw, unmatched));
+  hubs.sort(function(a, b) { return b.count - a.count; });
+
+  var loadChunks = loadRaw.split(/[\r\n,]+/);
+  var loadParsed = [];
+  for (var i = 0; i < loadChunks.length; i++) {
+    var chunk = loadChunks[i].trim();
+    if (chunk) loadParsed = loadParsed.concat(parseEntry(chunk, unmatched));
+  }
+  var loads = mergeItems(loadParsed);
+  renderAll(hubs, loads, unmatched);
+}
+
+function renderAll(hubs, loads, unmatched) {
+  var pinsLayer = document.getElementById("pins-layer");
+  var linesLayer = document.getElementById("match-lines-layer");
+  var hubListEl = document.getElementById("hub-list");
+  var loadListEl = document.getElementById("load-list");
+  var matchesHdr = document.getElementById("matches-header");
+  var unmatchedBox = document.getElementById("unmatched-box");
+  var tooltip = document.getElementById("tooltip");
+  var svgNS = "http://www.w3.org/2000/svg";
+
+  pinsLayer.innerHTML = "";
+  linesLayer.innerHTML = "";
+  hubListEl.innerHTML = "";
+  loadListEl.innerHTML = "";
+
+  var totalUnits = 0;
+  for (var i = 0; i < hubs.length; i++) totalUnits += hubs[i].count;
+  var totalLoadCount = 0;
+  for (var j = 0; j < loads.length; j++) totalLoadCount += loads[j].count;
+
+  document.getElementById("total-units").textContent = totalUnits;
+  document.getElementById("total-hubs").textContent = hubs.length;
+  document.getElementById("total-loads").textContent = totalLoadCount;
+
+  if (hubs.length === 0) {
+    hubListEl.innerHTML = '<div class="empty-state">No active fleet plotted.<br>Type towns in box 1 above to drop pins onto the map.</div>';
+  }
+
+  for (var hIdx = 0; hIdx < hubs.length; hIdx++) {
+    (function(hub) {
+      var pt = project(hub.lat, hub.lon);
+      var radius = Math.min(22, 10 + hub.count * 2.2);
+      var color = hub.isNight ? "#a855f7" : (hub.times.length > 0 ? "#f59e0b" : "#38bdf8");
+
+      var g = document.createElementNS(svgNS, "g");
+      g.setAttribute("class", "pin-group");
+
+      var ring = document.createElementNS(svgNS, "circle");
+      ring.setAttribute("cx", pt.x); ring.setAttribute("cy", pt.y); ring.setAttribute("r", radius + 4); ring.setAttribute("fill", color); ring.setAttribute("opacity", "0.22");
+      g.appendChild(ring);
+
+      var circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", pt.x); circle.setAttribute("cy", pt.y); circle.setAttribute("r", radius); circle.setAttribute("fill", color); circle.setAttribute("stroke", "#0f172a"); circle.setAttribute("stroke-width", "2");
+      g.appendChild(circle);
+
+      var countTxt = document.createElementNS(svgNS, "text");
+      countTxt.setAttribute("x", pt.x); countTxt.setAttribute("y", pt.y); countTxt.setAttribute("class", "pin-count"); countTxt.textContent = hub.count;
+      g.appendChild(countTxt);
+
+      var label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", pt.x + radius + 5); label.setAttribute("y", pt.y + 4); label.setAttribute("class", "pin-label");
+      var timeTag = hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.isNight ? " (Night)" : "");
+      label.textContent = hub.name + timeTag;
+      g.appendChild(label);
+
+      g.onmousemove = function(e) {
+        tooltip.style.display = "block";
+        tooltip.style.borderColor = color;
+        tooltip.style.left = (e.offsetX + 18) + "px";
+        tooltip.style.top = (e.offsetY - 10) + "px";
+        tooltip.innerHTML = '<strong style="color:' + color + ';">' + hub.name + ' &mdash; ' + hub.count + ' Available</strong><div style="color:#94a3b8;">' + hub.region + '</div>';
+      };
+      g.onmouseleave = function() { tooltip.style.display = "none"; };
+      pinsLayer.appendChild(g);
+
+      var item = document.createElement("div");
+      item.className = "hub-item";
+      var badgeClass = hub.isNight ? "badge night" : (hub.times.length ? "badge timed" : "badge");
+      var subNote = hub.times.length ? "Waves: " + hub.times.join(", ") : (hub.isNight ? "Night drivers" : hub.region);
+      item.innerHTML = '<div><div class="hub-name">' + hub.name + '</div><div class="hub-meta">' + subNote + '</div></div><span class="' + badgeClass + '">' + hub.count + 'x</span>';
+      hubListEl.appendChild(item);
+    })(hubs[hIdx]);
+  }
+
+  if (loads.length > 0) {
+    matchesHdr.style.display = "block";
+    for (var lIdx = 0; lIdx < loads.length; lIdx++) {
+      (function(load) {
+        var lPt = project(load.lat, load.lon);
+        var pinColor = load.isHaz ? "#ef4444" : "#10b981";
+        var strokeColor = load.isHaz ? "#fbbf24" : "#ffffff";
+
+        var rankedHubs = [];
+        for (var r = 0; r < hubs.length; r++) {
+          rankedHubs.push({ name: hubs[r].name, count: hubs[r].count, lat: hubs[r].lat, lon: hubs[r].lon, miles: estimateRoadMiles(load.lat, load.lon, hubs[r].lat, hubs[r].lon) });
+        }
+        rankedHubs.sort(function(a, b) { return a.miles - b.miles; });
+        rankedHubs = rankedHubs.slice(0, 3);
+
+        for (var m = 0; m < rankedHubs.length; m++) {
+          var match = rankedHubs[m];
+          var hPt = project(match.lat, match.lon);
+          var line = document.createElementNS(svgNS, "line");
+          line.setAttribute("x1", lPt.x); line.setAttribute("y1", lPt.y); line.setAttribute("x2", hPt.x); line.setAttribute("y2", hPt.y);
+          line.setAttribute("stroke", pinColor); line.setAttribute("stroke-width", m === 0 ? "2.4" : "1.3"); line.setAttribute("stroke-dasharray", m === 0 ? "5 4" : "2 5"); line.setAttribute("opacity", m === 0 ? "0.9" : "0.45");
+          linesLayer.appendChild(line);
+        }
+
+        var g = document.createElementNS(svgNS, "g");
+        g.setAttribute("class", "pin-group");
+        var size = load.isHaz ? 16 : 14;
+        var diamond = document.createElementNS(svgNS, "polygon");
+        diamond.setAttribute("points", lPt.x + "," + (lPt.y - size) + " " + (lPt.x + size) + "," + lPt.y + " " + lPt.x + "," + (lPt.y + size) + " " + (lPt.x - size) + "," + lPt.y);
+        diamond.setAttribute("fill", pinColor); diamond.setAttribute("stroke", strokeColor); diamond.setAttribute("stroke-width", "2.2");
+        g.appendChild(diamond);
+
+        var loadCountTxt = document.createElementNS(svgNS, "text");
+        loadCountTxt.setAttribute("x", lPt.x); loadCountTxt.setAttribute("y", lPt.y); loadCountTxt.setAttribute("class", "pin-count");
+        if (load.isHaz) loadCountTxt.setAttribute("fill", "#ffffff");
+        loadCountTxt.textContent = load.count;
+        g.appendChild(loadCountTxt);
+
+        var label = document.createElementNS(svgNS, "text");
+        label.setAttribute("x", lPt.x + 19); label.setAttribute("y", lPt.y + 4);
+        label.setAttribute("class", load.isHaz ? "pin-label haz-lbl" : "pin-label load-lbl");
+        label.textContent = load.isHaz ? ("\u2623 HAZ: " + load.name) : ("LOAD: " + load.name);
+        g.appendChild(label);
+
+        pinsLayer.appendChild(g);
+
+        var card = document.createElement("div");
+        card.className = load.isHaz ? "hub-item load-card haz-card" : "hub-item load-card";
+        var shortArr = [];
+        for (var q = 0; q < rankedHubs.length; q++) shortArr.push(rankedHubs[q].name + " (~" + rankedHubs[q].miles + "m)");
+        var matchText = shortArr.length ? "Nearest: " + shortArr.join(" \u2022 ") : "No fleet available";
+        var hazBadge = load.isHaz ? '<span class="badge haz">&#9763; HAZ / ADR</span>' : '';
+        var titleColor = load.isHaz ? "#fca5a5" : "#6ee7b7";
+        card.innerHTML = '<div><div class="hub-name" style="color:' + titleColor + ';">' + load.name + hazBadge + '</div><div class="match-line">' + matchText + '</div></div><span class="badge load">' + load.count + 'x</span>';
+        loadListEl.appendChild(card);
+      })(loads[lIdx]);
+    }
+  } else {
+    matchesHdr.style.display = "none";
+  }
+
+  if (unmatched.length > 0) {
+    unmatchedBox.style.display = "block";
+    unmatchedBox.textContent = "Unrecognized towns: " + unmatched.join(", ");
+  } else {
+    unmatchedBox.style.display = "none";
+  }
+}
+
+updateBoard();
+</script>
+</body>
+</html>
