@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher</title>
+<title>UK Transport Availability & Load Matcher (Shared)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; display: flex; height: 100vh; overflow: hidden; }
@@ -11,7 +11,9 @@
   .header { display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 16px; font-weight: 700; }
   .pill { font-size: 10px; font-weight: 700; color: #10b981; background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.4); padding: 3px 8px; border-radius: 99px; }
-  .pill.busy { color: #fbbf24; border-color: #f59e0b; }
+  .pill.busy { color: #fbbf24; border-color: #f59e0b; background: rgba(245,158,11,0.15); }
+  .pill.err { color: #fca5a5; border-color: #ef4444; background: rgba(239,68,68,0.15); }
+  .sync-bar { font-size: 11px; color: #94a3b8; background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 6px 10px; display: flex; justify-content: space-between; align-items: center; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .stat { background: #0f172a; border: 1px solid #334155; border-radius: 7px; padding: 7px; text-align: center; }
   .stat b { font-size: 18px; color: #38bdf8; display: block; }
@@ -19,7 +21,7 @@
   .stat span { font-size: 11px; color: #94a3b8; }
   label { font-size: 12px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 4px; }
   textarea { width: 100%; background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 7px; padding: 8px; font-family: monospace; font-size: 12px; resize: vertical; }
-  #avail { height: 135px; }
+  #avail { height: 130px; }
   #loads { height: 65px; border-color: rgba(16,185,129,0.45); }
   textarea:focus { outline: none; border-color: #38bdf8; }
   .btns { display: flex; gap: 7px; }
@@ -55,24 +57,25 @@
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v9.0 ALL-UK</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v10.0 SHARED</span></div>
+  <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
     <div class="stat"><b id="s-hubs">0</b><span>Hubs</span></div>
     <div class="stat g"><b id="s-loads">0</b><span>Offers</span></div>
   </div>
   <div>
-    <label><span>1. Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Any UK Town / Postcode</span></label>
-    <textarea id="avail" oninput="run()" placeholder="e.g. Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400&#10;Bicester"></textarea>
+    <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Shared Live</span></label>
+    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400"></textarea>
   </div>
   <div>
     <label><span>2. Potential Load Offers</span><span style="color:#10b981;font-size:11px;">Supports "Haz" / Postcodes</span></label>
-    <textarea id="loads" oninput="run()" placeholder="e.g. Northampton Haz, NN4 7YB"></textarea>
+    <textarea id="loads" oninput="onUserEdit()" placeholder="e.g. Northampton Haz, NN4 7YB"></textarea>
   </div>
   <div class="btns">
-    <button type="button" class="btn-main" onclick="run()">Update Map</button>
-    <button type="button" class="btn-sub" onclick="document.getElementById('loads').value='';run()">Clear Loads</button>
-    <button type="button" class="btn-sub" onclick="document.getElementById('avail').value='';document.getElementById('loads').value='';run()">Clear All</button>
+    <button type="button" class="btn-main" onclick="pushToCloud()">Sync Now</button>
+    <button type="button" class="btn-sub" onclick="document.getElementById('loads').value='';onUserEdit()">Clear Loads</button>
+    <button type="button" class="btn-sub" onclick="document.getElementById('avail').value='';document.getElementById('loads').value='';onUserEdit()">Clear All</button>
   </div>
   <div class="msg" id="msg"></div>
   <div class="sec" id="hdr-loads" style="display:none;color:#6ee7b7;">Offered Loads &amp; Nearest Fleet</div>
@@ -105,6 +108,9 @@
 </div>
 
 <script>
+// PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW (keep the quotes, no trailing slash):
+var DB_URL = "https://console.firebase.google.com/project/uk-transport-availability/database/uk-transport-availability-default-rtdb/data/~2F";
+
 var HUBS = {
   "wolverhampton":["Wolverhampton",52.5862,-2.1288,"West Midlands"], "amesbury":["Amesbury",51.1743,-1.7805,"South West"],
   "deeside":["Deeside",53.2045,-3.0338,"North Wales / NW"], "darlington":["Darlington",54.5236,-1.5594,"North East"],
@@ -128,8 +134,8 @@ var HUBS = {
   "edinburgh":["Edinburgh",55.9533,-3.1883,"Scotland"], "glasgow":["Glasgow",55.8642,-4.2518,"Scotland"]
 };
 
-var CACHE = {}, BUSY = {}, MISS = {}, timer = null;
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v9") || "{}"); } catch (e) {}
+var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastRev = 0;
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v10") || "{}"); } catch (e) {}
 
 function pt(lat, lon) { return { x: 448 + lon * 66, y: 708 - (lat - 51.5) * 96 }; }
 function miles(a, b) {
@@ -154,11 +160,79 @@ function words(str) {
   return res;
 }
 
+function nowStamp() {
+  var d = new Date(), hh = ("0" + d.getHours()).slice(-2), mm = ("0" + d.getMinutes()).slice(-2), ss = ("0" + d.getSeconds()).slice(-2);
+  return hh + ":" + mm + ":" + ss;
+}
+
+function setSyncState(text, cls, info) {
+  var st = document.getElementById("status");
+  if (st) { st.textContent = text; st.className = "pill" + (cls ? " " + cls : ""); }
+  if (info) document.getElementById("sync-info").textContent = info;
+  document.getElementById("last-time").textContent = nowStamp();
+}
+
+function onUserEdit() {
+  isTyping = true;
+  run();
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(function() {
+    isTyping = false;
+    pushToCloud();
+  }, 700);
+}
+
+function pushToCloud() {
+  if (!DB_URL || DB_URL.indexOf("http") !== 0) {
+    setSyncState("LOCAL ONLY", "busy", "Add Firebase URL to enable 10-crew sync");
+    return;
+  }
+  setSyncState("SAVING...", "busy", "Syncing update to crew...");
+  var rev = Date.now();
+  lastRev = rev;
+  var payload = {
+    avail: document.getElementById("avail").value,
+    loads: document.getElementById("loads").value,
+    rev: rev
+  };
+  fetch(DB_URL + "/board.json", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  }).then(function(r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    setSyncState("CREW LIVE", "", "Synced across all crew screens");
+  }).catch(function(e) {
+    setSyncState("SYNC ERR", "err", "Check Firebase rules (" + e.message + ")");
+  });
+}
+
+function pullFromCloud() {
+  if (!DB_URL || DB_URL.indexOf("http") !== 0 || isTyping) return;
+  fetch(DB_URL + "/board.json?t=" + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data) {
+        setSyncState("CREW LIVE", "", "Connected (empty board)");
+        return;
+      }
+      if (data.rev && data.rev !== lastRev) {
+        lastRev = data.rev;
+        var aEl = document.getElementById("avail"), lEl = document.getElementById("loads");
+        if (document.activeElement !== aEl) aEl.value = data.avail || "";
+        if (document.activeElement !== lEl) lEl.value = data.loads || "";
+        run();
+      }
+      setSyncState("CREW LIVE", "", "Live crew sync active");
+    })
+    .catch(function() {
+      setSyncState("OFFLINE", "err", "Reconnecting to crew board...");
+    });
+}
+
 function lookup(q) {
   if (!q || BUSY[q] || MISS[q] || CACHE[q]) return;
   BUSY[q] = true;
-  var st = document.getElementById("status");
-  st.textContent = "LOCATING..."; st.className = "pill busy";
   var w = words(q);
   var isPc = (w.length === 2 && w[0].length >= 2 && w[0].length <= 4 && w[1].length === 3 && isNum(w[1].charAt(0)));
   var isOut = (w.length === 1 && w[0].length >= 2 && w[0].length <= 4 && !isNum(w[0].charAt(0)) && isNum(w[0].charAt(w[0].length - 1)));
@@ -175,7 +249,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v9", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v10", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -325,12 +399,12 @@ function run() {
   if (pend.length) {
     clearTimeout(timer);
     timer = setTimeout(function() { for (var p = 0; p < pend.length; p++) lookup(pend[p]); }, 500);
-  } else if (!Object.keys(BUSY).length) {
-    var st = document.getElementById("status");
-    st.textContent = "v9.0 ALL-UK"; st.className = "pill";
   }
 }
+
 run();
+pullFromCloud();
+setInterval(pullFromCloud, 3000);
 </script>
 </body>
 </html>
