@@ -3,12 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Pro Map)</title>
+<title>UK Transport Availability & Load Matcher (True Geo)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #070d19; color: #f1f5f9; display: flex; height: 100vh; overflow: hidden; }
 
-  /* Sidebar */
   .sidebar { width: 405px; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 16px; gap: 11px; overflow-y: auto; z-index: 10; box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
   .header { display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: #f8fafc; }
@@ -52,7 +51,6 @@
   .tag.g { color: #34d399; background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.35); }
   .tag.h { color: #fca5a5; background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.55); font-size: 10px; padding: 1px 6px; margin-left: 5px; }
 
-  /* Map Canvas */
   .map {
     flex: 1;
     position: relative;
@@ -131,12 +129,11 @@
   .lbl.g { fill: #6ee7b7; font-weight: 700; }
   .lbl.h { fill: #fecaca; font-weight: 700; }
   .cnt { font-size: 9.5px; font-weight: 800; fill: #04101f; text-anchor: middle; dominant-baseline: central; }
-  .mway-tag { font-size: 7.5px; font-weight: 700; fill: #64748b; text-anchor: middle; letter-spacing: 0.04em; }
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v14.0 PRO MAP</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v15.0 TRUE GEO</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -145,7 +142,7 @@
   </div>
   <div>
     <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Shared Live</span></label>
-    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Wolverhampton x 3&#10;Amesbury 0700, 1000, 1400"></textarea>
+    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Wolverhampton x 3&#10;King's Lynn&#10;Amesbury 0700, 1000, 1400"></textarea>
   </div>
   <div>
     <label><span>2. Potential Load Offers</span><span style="color:#34d399;font-size:11px;">Supports "Haz" / Postcodes</span></label>
@@ -173,7 +170,7 @@
     <div class="row"><span class="dia hz"></span> &#9763; Hazardous / ADR</div>
   </div>
 
-  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Hover pins for details</div>
+  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; True GPS Coastline</div>
   <div class="zoom-controls">
     <button type="button" class="zoom-btn" onclick="stepZoom(-0.45)" title="Zoom Out">&minus;</button>
     <span class="zoom-level" id="zoom-pct">100%</span>
@@ -199,81 +196,10 @@
     </defs>
 
     <g id="viewport">
-      <!-- Subtle Navigation Graticule -->
-      <g id="grid-layer" stroke="#132038" stroke-width="1" stroke-dasharray="3 5">
-        <line x1="40" y1="150" x2="600" y2="150"/>
-        <line x1="40" y1="300" x2="600" y2="300"/>
-        <line x1="40" y1="450" x2="600" y2="450"/>
-        <line x1="40" y1="600" x2="600" y2="600"/>
-        <line x1="40" y1="750" x2="600" y2="750"/>
-        <line x1="160" y1="40" x2="160" y2="850"/>
-        <line x1="300" y1="40" x2="300" y2="850"/>
-        <line x1="440" y1="40" x2="440" y2="850"/>
-        <line x1="560" y1="40" x2="560" y2="850"/>
-      </g>
-
-      <!-- Ireland & Northern Ireland Context (Muted Reference) -->
-      <g fill="#101827" stroke="#243249" stroke-width="1.4" stroke-linejoin="round">
-        <path d="M 164,452 L 182,448 L 194,462 L 189,482 L 178,496 L 166,506 L 154,538 L 146,582 L 122,612 L 88,625 L 62,618 L 54,596 L 74,572 L 68,546 L 84,515 L 76,488 L 106,474 L 128,464 L 148,450 Z"/>
-      </g>
-
-      <!-- High-Accuracy Great Britain Coastline -->
-      <g id="land-layer" fill="url(#ukLandGrad)" stroke="#3b5278" stroke-width="1.8" stroke-linejoin="round" filter="url(#landGlow)">
-        <!-- Mainland Great Britain -->
-        <path d="
-          M 142,818 L 164,804 L 188,798 L 214,791 L 236,779 L 254,774 L 274,782
-          L 304,782 L 328,776 L 348,784 L 372,782 L 398,778 L 434,776 L 468,770
-          L 494,764 L 516,753 L 502,742 L 478,738 L 496,730 L 522,724 L 534,704
-          L 546,682 L 552,654 L 546,628 L 522,618 L 496,618 L 486,628 L 476,622
-          L 474,594 L 462,566 L 444,538 L 432,524 L 448,522 L 432,498 L 412,474
-          L 396,448 L 382,422 L 368,396 L 352,374 L 334,358 L 314,352 L 336,338
-          L 346,318 L 324,310 L 344,288 L 364,254 L 372,226 L 366,204 L 332,202
-          L 306,208 L 296,218 L 292,194 L 304,168 L 308,142 L 306,118 L 274,116
-          L 242,120 L 226,136 L 224,168 L 218,204 L 208,238 L 218,266 L 212,296
-          L 234,312 L 226,342 L 248,356 L 276,362 L 292,384 L 276,406 L 292,428
-          L 306,454 L 302,482 L 292,506 L 302,528 L 288,538 L 266,538 L 244,544
-          L 232,554 L 248,572 L 242,598 L 222,622 L 202,638 L 198,660 L 222,672
-          L 254,676 L 282,678 L 298,672 L 284,692 L 254,712 L 228,728 L 204,752
-          L 174,782 L 146,806 Z
-        "/>
-        <!-- Isle of Wight -->
-        <path d="M 366,787 L 380,785 L 383,792 L 369,795 Z"/>
-        <!-- Anglesey -->
-        <path d="M 228,532 L 242,528 L 245,539 L 230,541 Z"/>
-        <!-- Isle of Man -->
-        <path d="M 222,456 L 231,450 L 234,462 L 224,467 Z"/>
-        <!-- Hebrides / Mull / Skye accents -->
-        <path d="M 194,142 L 204,132 L 206,158 L 196,166 Z"/>
-        <path d="M 198,196 L 210,192 L 212,208 L 200,210 Z"/>
-      </g>
-
-      <!-- UK Strategic Motorway Network -->
-      <g id="road-layer" fill="none" stroke="#283956" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-        <!-- M1 (London -> Milton Keynes -> Northampton -> Leicester -> Nottingham -> Sheffield -> Leeds) -->
-        <path d="M 456,722 L 432,674 L 414,644 L 398,610 L 396,574 L 382,532 L 376,488"/>
-        <!-- M6 (Rugby -> Coventry -> Birmingham -> Wolverhampton -> Stoke -> Warrington -> Preston -> Carlisle) -->
-        <path d="M 404,630 L 384,626 L 358,616 L 344,606 L 342,566 L 324,528 L 318,494 L 308,412"/>
-        <!-- M4 (London -> Reading -> Swindon -> Bristol -> Newport -> Cardiff -> Swansea) -->
-        <path d="M 456,722 L 410,726 L 366,718 L 320,726 L 296,724 L 284,712 L 244,710"/>
-        <!-- A1 / A1(M) (London -> Hatfield -> Peterborough -> Doncaster -> Darlington -> Newcastle -> Edinburgh) -->
-        <path d="M 456,722 L 452,696 L 452,620 L 398,518 L 376,422 L 372,380 L 296,294"/>
-        <!-- M5 (Birmingham -> Worcester -> Gloucester -> Bristol -> Exeter) -->
-        <path d="M 358,616 L 342,644 L 340,676 L 320,726 L 268,782"/>
-        <!-- M62 (Liverpool -> Warrington -> Manchester -> Leeds -> Hull) -->
-        <path d="M 304,528 L 324,528 L 340,518 L 376,488 L 438,494"/>
-        <!-- M8 (Glasgow -> Edinburgh) -->
-        <path d="M 244,302 L 296,294"/>
-      </g>
-
-      <!-- Subtle Motorway Labels -->
-      <g id="mway-labels" opacity="0.75">
-        <text x="415" y="592" class="mway-tag">M1</text>
-        <text x="326" y="555" class="mway-tag">M6</text>
-        <text x="382" y="734" class="mway-tag">M4</text>
-        <text x="318" y="688" class="mway-tag">M5</text>
-        <text x="434" y="576" class="mway-tag">A1(M)</text>
-      </g>
-
+      <g id="grid-layer" stroke="#132038" stroke-width="1" stroke-dasharray="3 5"></g>
+      <g id="ireland-layer" fill="#101827" stroke="#243249" stroke-width="1.3" stroke-linejoin="round"></g>
+      <g id="land-layer" fill="url(#ukLandGrad)" stroke="#3b5278" stroke-width="1.7" stroke-linejoin="round" filter="url(#landGlow)"></g>
+      <g id="road-layer" fill="none" stroke="#283956" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></g>
       <g id="lines"></g>
       <g id="pins"></g>
     </g>
@@ -282,19 +208,121 @@
 
 <script>
 // PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
-var DB_URL = "https://uk-transport-availability-default-rtdb.europe-west1.firebasedatabase.app";
+var DB_URL = "PASTE_YOUR_FIREBASE_URL_HERE";
 
 while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
   DB_URL = DB_URL.slice(0, -1);
 }
 
-// Calibrated UK Geographic Projection (matched precisely to the high-accuracy GB coastline above)
+// Unified UK Geographic Projection (used by BOTH the coastline polygons and every town/postcode pin!)
 function pt(lat, lon) {
   return {
-    x: 462 + (lon * 65.5),
-    y: 724 - ((lat - 51.5) * 101.5)
+    x: 462 + (lon * 61.5),
+    y: 726 - ((lat - 51.5) * 99.5)
   };
 }
+
+// Build exact GPS-projected coastlines & motorways so no coastal town ever lands in the sea
+(function buildTrueGeoMap() {
+  var ns = "http://www.w3.org/2000/svg";
+
+  function coordsToPath(coords, close) {
+    var d = "";
+    for (var i = 0; i < coords.length; i++) {
+      var p = pt(coords[i][0], coords[i][1]);
+      d += (i === 0 ? "M " : " L ") + p.x.toFixed(1) + "," + p.y.toFixed(1);
+    }
+    return close ? d + " Z" : d;
+  }
+
+  // Real Lat/Lon vertices of Great Britain (including accurate The Wash, Humber, Thames, Severn, Wales, Cumbria, Scotland)
+  var GB_MAINLAND = [
+    [50.07,-5.71],[50.12,-5.53],[50.00,-5.20],[50.25,-4.78],[50.35,-4.14],[50.22,-3.65],
+    [50.46,-3.50],[50.62,-3.38],[50.70,-2.93],[50.61,-2.45],[50.61,-1.96],[50.72,-1.80],
+    [50.78,-1.10],[50.73,-0.78],[50.82,-0.14],[50.74,0.25],[50.92,0.96],[51.13,1.31],
+    [51.38,1.44],[51.37,1.10],[51.45,0.74],[51.50,0.45],[51.53,0.72],[51.62,0.92],
+    [51.78,1.05],[51.85,1.28],[51.96,1.35],[52.08,1.48],[52.48,1.76],[52.61,1.73],
+    [52.75,1.62],[52.94,1.30],[52.96,0.85],[52.93,0.49],[52.78,0.40],[52.76,0.38],
+    [52.81,0.12],[52.95,0.05],[53.15,0.34],[53.36,0.26],[53.56,0.08],[53.72,-0.34],
+    [53.65,-0.10],[53.75,0.05],[54.08,-0.18],[54.28,-0.40],[54.49,-0.61],[54.62,-1.05],
+    [54.65,-1.18],[54.90,-1.36],[55.02,-1.43],[55.34,-1.58],[55.58,-1.65],[55.77,-2.00],
+    [55.92,-2.14],[56.00,-2.52],[56.06,-2.72],[56.00,-3.18],[56.01,-3.40],[56.07,-3.38],
+    [56.18,-3.02],[56.28,-2.60],[56.45,-2.82],[56.47,-3.00],[56.56,-2.58],[56.71,-2.46],
+    [56.96,-2.20],[57.15,-2.08],[57.32,-1.95],[57.52,-1.78],[57.69,-2.00],[57.67,-2.52],
+    [57.68,-3.32],[57.60,-3.85],[57.52,-4.18],[57.58,-4.08],[57.70,-3.96],[57.86,-3.78],
+    [58.18,-3.42],[58.44,-3.09],[58.64,-3.07],[58.61,-3.54],[58.55,-4.25],[58.62,-4.72],
+    [58.58,-5.00],[58.25,-5.15],[57.92,-5.45],[57.72,-5.72],[57.35,-5.82],[56.95,-5.88],
+    [56.72,-6.18],[56.65,-5.95],[56.45,-5.45],[56.15,-5.62],[55.82,-5.68],[55.32,-5.62],
+    [55.42,-5.52],[55.85,-5.42],[55.96,-4.85],[55.94,-4.55],[55.65,-4.82],[55.46,-4.63],
+    [55.04,-5.12],[54.82,-4.95],[54.64,-4.88],[54.76,-4.38],[54.82,-4.05],[54.88,-3.60],
+    [54.96,-3.22],[54.92,-3.08],[54.78,-3.40],[54.55,-3.60],[54.18,-3.25],[54.08,-3.18],
+    [54.12,-2.90],[53.95,-3.02],[53.75,-3.05],[53.65,-3.02],[53.45,-3.04],[53.32,-2.85],
+    [53.30,-3.08],[53.42,-3.05],[53.36,-3.18],[53.24,-3.12],[53.33,-3.48],[53.32,-3.83],
+    [53.22,-4.14],[52.95,-4.45],[52.80,-4.76],[52.90,-4.42],[52.92,-4.12],[52.72,-4.06],
+    [52.42,-4.08],[52.12,-4.65],[51.90,-5.28],[51.70,-5.15],[51.65,-4.92],[51.68,-4.70],
+    [51.75,-4.32],[51.58,-4.28],[51.56,-3.96],[51.60,-3.78],[51.40,-3.48],[51.48,-3.16],
+    [51.56,-2.98],[51.62,-2.65],[51.50,-2.72],[51.35,-2.98],[51.22,-3.02],[51.22,-3.45],
+    [51.18,-4.15],[51.02,-4.24],[50.82,-4.55],[50.55,-4.95],[50.35,-5.15],[50.18,-5.48]
+  ];
+
+  var ISLE_OF_WIGHT = [[50.76,-1.30],[50.68,-1.08],[50.58,-1.30],[50.67,-1.56]];
+  var ANGLESEY      = [[53.41,-4.48],[53.32,-4.08],[53.15,-4.22],[53.24,-4.55]];
+  var ISLE_OF_MAN   = [[54.41,-4.38],[54.22,-4.35],[54.06,-4.62],[54.24,-4.72]];
+  var SKYE          = [[57.65,-6.30],[57.32,-5.75],[57.05,-5.95],[57.35,-6.65]];
+  var MULL          = [[56.62,-6.15],[56.45,-5.68],[56.30,-6.05],[56.42,-6.35]];
+  var IRELAND_REF   = [
+    [55.22,-6.12],[54.82,-5.75],[54.62,-5.55],[54.22,-5.65],[54.02,-6.18],
+    [53.72,-6.24],[53.35,-6.15],[52.98,-6.02],[52.34,-6.36],[52.15,-6.95],
+    [51.85,-8.25],[51.55,-9.65],[52.15,-10.25],[52.65,-9.85],[53.25,-9.15],
+    [53.55,-10.05],[54.25,-9.95],[54.45,-8.45],[55.15,-7.65],[55.25,-6.65]
+  ];
+
+  var landLayer = document.getElementById("land-layer");
+  var polyList = [GB_MAINLAND, ISLE_OF_WIGHT, ANGLESEY, ISLE_OF_MAN, SKYE, MULL];
+  for (var i = 0; i < polyList.length; i++) {
+    var p = document.createElementNS(ns, "path");
+    p.setAttribute("d", coordsToPath(polyList[i], true));
+    landLayer.appendChild(p);
+  }
+
+  var irPath = document.createElementNS(ns, "path");
+  irPath.setAttribute("d", coordsToPath(IRELAND_REF, true));
+  document.getElementById("ireland-layer").appendChild(irPath);
+
+  // Real GPS-projected Strategic Motorway Network (M1, M6, M4, M5, M62, M8, A1(M))
+  var ROADS = [
+    [[51.51,-0.13],[51.88,-0.42],[52.04,-0.76],[52.24,-0.90],[52.64,-1.14],[52.95,-1.16],[53.38,-1.47],[53.80,-1.55]], // M1
+    [[52.37,-1.26],[52.41,-1.52],[52.49,-1.89],[52.59,-2.13],[53.00,-2.18],[53.39,-2.60],[53.76,-2.70],[54.89,-2.93]], // M6
+    [[51.51,-0.13],[51.45,-0.98],[51.56,-1.78],[51.45,-2.59],[51.58,-3.00],[51.48,-3.18],[51.62,-3.94]],              // M4
+    [[51.51,-0.13],[51.76,-0.23],[52.57,-0.24],[53.52,-1.13],[54.52,-1.56],[54.98,-1.62],[55.95,-3.19]],              // A1(M)
+    [[52.49,-1.89],[52.19,-2.22],[51.86,-2.24],[51.45,-2.59],[50.72,-3.53]],                                          // M5
+    [[53.41,-2.99],[53.39,-2.60],[53.48,-2.24],[53.80,-1.55],[53.77,-0.33]],                                          // M62
+    [[55.86,-4.25],[55.95,-3.19]]                                                                                     // M8
+  ];
+  var roadLayer = document.getElementById("road-layer");
+  for (var r = 0; r < ROADS.length; r++) {
+    var rp = document.createElementNS(ns, "path");
+    rp.setAttribute("d", coordsToPath(ROADS[r], false));
+    roadLayer.appendChild(rp);
+  }
+
+  // Subtle Lat/Lon Graticule Lines
+  var gridLayer = document.getElementById("grid-layer");
+  var lats = [50, 52, 54, 56, 58];
+  for (var la = 0; la < lats.length; la++) {
+    var p1 = pt(lats[la], -7.5), p2 = pt(lats[la], 2.5);
+    var gl = document.createElementNS(ns, "line");
+    gl.setAttribute("x1", p1.x); gl.setAttribute("y1", p1.y); gl.setAttribute("x2", p2.x); gl.setAttribute("y2", p2.y);
+    gridLayer.appendChild(gl);
+  }
+  var lons = [-6, -4, -2, 0, 2];
+  for (var lo = 0; lo < lons.length; lo++) {
+    var p3 = pt(49.5, lons[lo]), p4 = pt(59.0, lons[lo]);
+    var gl2 = document.createElementNS(ns, "line");
+    gl2.setAttribute("x1", p3.x); gl2.setAttribute("y1", p3.y); gl2.setAttribute("x2", p4.x); gl2.setAttribute("y2", p4.y);
+    gridLayer.appendChild(gl2);
+  }
+})();
 
 // Pan & Pinpoint-Zoom State
 var zoomScale = 1, panX = 0, panY = 0, isDragging = false, dragStartX = 0, dragStartY = 0;
@@ -305,10 +333,9 @@ function applyTransform() {
 
   var land = document.getElementById("land-layer");
   var road = document.getElementById("road-layer");
-  if (land) land.setAttribute("stroke-width", (1.8 / zoomScale).toFixed(2));
-  if (road) road.setAttribute("stroke-width", (1.7 / zoomScale).toFixed(2));
+  if (land) land.setAttribute("stroke-width", (1.7 / zoomScale).toFixed(2));
+  if (road) road.setAttribute("stroke-width", (1.6 / zoomScale).toFixed(2));
 
-  // Keep pins and labels compact and pinpoint-sized at all zoom levels
   var inv = (1 / zoomScale).toFixed(4);
   var pinNodes = document.querySelectorAll(".pin-node");
   for (var i = 0; i < pinNodes.length; i++) {
@@ -405,11 +432,12 @@ var HUBS = {
   "doncaster":["Doncaster",53.5228,-1.1285,"South Yorkshire"], "norwich":["Norwich",52.6309,1.2974,"East Anglia"],
   "felixstowe":["Felixstowe",51.9617,1.3513,"Suffolk Port"], "cambridge":["Cambridge",52.2053,0.1218,"East"],
   "oxford":["Oxford",51.7520,-1.2577,"Thames Valley"], "gloucester":["Gloucester",51.8642,-2.2382,"South West"],
-  "edinburgh":["Edinburgh",55.9533,-3.1883,"Scotland"], "glasgow":["Glasgow",55.8642,-4.2518,"Scotland"]
+  "edinburgh":["Edinburgh",55.9533,-3.1883,"Scotland"], "glasgow":["Glasgow",55.8642,-4.2518,"Scotland"],
+  "kings lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"], "king s lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"]
 };
 
 var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "";
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v14") || "{}"); } catch (e) {}
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v15") || "{}"); } catch (e) {}
 
 function miles(a, b) {
   var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
@@ -526,7 +554,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v14", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v15", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -633,13 +661,11 @@ function run() {
       pg.setAttribute("data-y", p.y.toFixed(2));
       pg.setAttribute("filter", "url(#pinShadow)");
 
-      // Outer subtle halo
       var halo = document.createElementNS(ns, "circle");
       halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 3.5);
       halo.setAttribute("fill", col); halo.setAttribute("opacity", "0.24");
       pg.appendChild(halo);
 
-      // Core pin circle
       var c = document.createElementNS(ns, "circle");
       c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
       c.setAttribute("fill", col); c.setAttribute("stroke", "#090f1d"); c.setAttribute("stroke-width", "1.8");
@@ -649,7 +675,6 @@ function run() {
       tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
       pg.appendChild(tx);
 
-      // Clean dark pill badge behind city label
       var labelStr = hub.name + (hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : ""));
       var pillW = labelStr.length * 6.2 + 10;
       var rect = document.createElementNS(ns, "rect");
