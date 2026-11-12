@@ -435,3 +435,364 @@ var HUBS = {
   "bristol":["Bristol",51.4545,-2.5879,"South West"], "swindon":["Swindon",51.5558,-1.7797,"South West"],
   "southampton":["Southampton",50.9097,-1.4044,"South Coast"], "cardiff":["Cardiff",51.4816,-3.1791,"South Wales"],
   "liverpool":["Liverpool",53.4084,-2.9916,"Merseyside"], "warrington":["Warrington",53.3900,-2.5970,"North West"],
+  "wrexham":["Wrexham",53.0462,-2.9925,"North Wales (A483)"], "preston":["Preston",53.7632,-2.7031,"Lancashire (M6)"],
+  "crewe":["Crewe",53.0998,-2.4401,"Cheshire (M6)"],
+  "newcastle":["Newcastle",54.9783,-1.6178,"North East"], "hull":["Hull",53.7676,-0.3274,"East Yorkshire"],
+  "doncaster":["Doncaster",53.5228,-1.1285,"South Yorkshire"], "norwich":["Norwich",52.6309,1.2974,"East Anglia"],
+  "felixstowe":["Felixstowe",51.9617,1.3513,"Suffolk Port"], "cambridge":["Cambridge",52.2053,0.1218,"East"],
+  "oxford":["Oxford",51.7520,-1.2577,"Thames Valley"], "gloucester":["Gloucester",51.8642,-2.2382,"South West"],
+  "edinburgh":["Edinburgh",55.9533,-3.1883,"Scotland"], "glasgow":["Glasgow",55.8642,-4.2518,"Scotland"],
+  "kings lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"], "king s lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"]
+};
+
+var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "";
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v16") || "{}"); } catch (e) {}
+
+function miles(a, b) {
+  var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
+  var s1 = Math.sin(dLat / 2), s2 = Math.sin(dLon / 2);
+  var h = s1 * s1 + Math.cos(a.lat * 0.0174533) * Math.cos(b.lat * 0.0174533) * s2 * s2;
+  return Math.round(3958.8 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)) * 1.22);
+}
+function isNum(s) {
+  if (!s) return false;
+  for (var i = 0; i < s.length; i++) if (s.charCodeAt(i) < 48 || s.charCodeAt(i) > 57) return false;
+  return true;
+}
+function words(str) {
+  var out = "", res = [];
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    out += ((c >= 97 && c <= 122) || (c >= 65 && c <= 90) || (c >= 48 && c <= 57) || str.charAt(i) === ":") ? str.charAt(i).toLowerCase() : " ";
+  }
+  var p = out.split(" ");
+  for (var j = 0; j < p.length; j++) if (p[j]) res.push(p[j]);
+  return res;
+}
+
+function nowStamp() {
+  var d = new Date(), hh = ("0" + d.getHours()).slice(-2), mm = ("0" + d.getMinutes()).slice(-2), ss = ("0" + d.getSeconds()).slice(-2);
+  return hh + ":" + mm + ":" + ss;
+}
+
+function setSyncState(text, cls, info) {
+  var st = document.getElementById("status");
+  if (st) { st.textContent = text; st.className = "pill" + (cls ? " " + cls : ""); }
+  if (info) document.getElementById("sync-info").textContent = info;
+  document.getElementById("last-time").textContent = nowStamp();
+}
+
+function onUserEdit() {
+  isTyping = true;
+  run();
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(function() {
+    isTyping = false;
+    pushToCloud();
+  }, 600);
+}
+
+function pushToCloud() {
+  if (!DB_URL || DB_URL.indexOf("http") !== 0) {
+    setSyncState("LOCAL ONLY", "busy", "Add Firebase URL to enable 10-crew sync");
+    return;
+  }
+  setSyncState("SAVING...", "busy", "Sending update to crew...");
+  var aVal = document.getElementById("avail").value;
+  var lVal = document.getElementById("loads").value;
+  lastSnapshot = aVal + "|||" + lVal;
+
+  fetch(DB_URL + "/board.json", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ avail: aVal, loads: lVal, updated: Date.now() })
+  }).then(function(r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    setSyncState("CREW LIVE", "", "Saved & shared with crew");
+  }).catch(function(e) {
+    setSyncState("SYNC ERR", "err", "Check Firebase Rules (" + e.message + ")");
+  });
+}
+
+function pullFromCloud() {
+  if (!DB_URL || DB_URL.indexOf("http") !== 0 || isTyping) return;
+  fetch(DB_URL + "/board.json?t=" + Date.now())
+    .then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+    .then(function(data) {
+      if (!data) {
+        setSyncState("CREW LIVE", "", "Connected (board empty)");
+        return;
+      }
+      var remoteA = data.avail || "";
+      var remoteL = data.loads || "";
+      var snap = remoteA + "|||" + remoteL;
+      if (snap !== lastSnapshot) {
+        lastSnapshot = snap;
+        document.getElementById("avail").value = remoteA;
+        document.getElementById("loads").value = remoteL;
+        run();
+        setSyncState("CREW LIVE", "", "Updated from crew at " + nowStamp());
+      } else {
+        setSyncState("CREW LIVE", "", "Live crew sync active");
+      }
+    })
+    .catch(function(e) {
+      setSyncState("SYNC ERR", "err", "Connection error (" + e.message + ")");
+    });
+}
+
+function lookup(q) {
+  if (!q || BUSY[q] || MISS[q] || CACHE[q]) return;
+  BUSY[q] = true;
+  var w = words(q);
+  var isPc = (w.length === 2 && w[0].length >= 2 && w[0].length <= 4 && w[1].length === 3 && isNum(w[1].charAt(0)));
+  var isOut = (w.length === 1 && w[0].length >= 2 && w[0].length <= 4 && !isNum(w[0].charAt(0)) && isNum(w[0].charAt(w[0].length - 1)));
+  var url = isPc ? ("https://api.postcodes.io/postcodes/" + encodeURIComponent(w[0] + w[1]))
+          : isOut ? ("https://api.postcodes.io/outcodes/" + encodeURIComponent(w[0]))
+          : ("https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&limit=1&q=" + encodeURIComponent(q + ", UK"));
+
+  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+    delete BUSY[q];
+    if ((isPc || isOut) && d && d.status === 200 && d.result) {
+      CACHE[q] = [d.result.postcode || d.result.outcode, d.result.latitude, d.result.longitude, d.result.region || "UK Postcode"];
+    } else if (!isPc && !isOut && d && d.length > 0) {
+      CACHE[q] = [d[0].display_name.split(",")[0], parseFloat(d[0].lat), parseFloat(d[0].lon), "UK Location"];
+    } else {
+      MISS[q] = true;
+    }
+    try { localStorage.setItem("uk_geo_v16", JSON.stringify(CACHE)); } catch (e) {}
+    run();
+  }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
+}
+
+function parse(text, missList, pendList) {
+  var lf = String.fromCharCode(10), cr = String.fromCharCode(13);
+  var lines = text.split(cr).join(lf).split(lf), out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var tok = words(line), pad = " " + tok.join(" ") + " ";
+    var times = [], night = pad.indexOf(" night ") !== -1, haz = pad.indexOf(" haz ") !== -1 || pad.indexOf(" adr ") !== -1;
+    var cnt = 1, rem = [];
+    for (var t = 0; t < tok.length; t++) {
+      var w = tok[t], used = false;
+      if (w.charAt(w.length - 1) === "x" && isNum(w.slice(0, -1))) { cnt = parseInt(w.slice(0, -1), 10); used = true; }
+      else if (w.charAt(0) === "x" && isNum(w.slice(1))) { cnt = parseInt(w.slice(1), 10); used = true; }
+      else if (w === "x" && t > 0 && isNum(tok[t - 1])) { cnt = parseInt(tok[t - 1], 10); used = true; }
+      else if (w === "x" && t + 1 < tok.length && isNum(tok[t + 1])) { cnt = parseInt(tok[t + 1], 10); used = true; }
+      else if (isNum(w) && ((t + 1 < tok.length && tok[t + 1] === "x") || (t > 0 && tok[t - 1] === "x"))) { used = true; }
+      else if (w.indexOf(":") !== -1 && w.length >= 4) { times.push(w); used = true; }
+      else if (isNum(w) && w.length === 4) { times.push(w.slice(0, 2) + ":" + w.slice(2)); used = true; }
+      else if (w === "haz" || w === "adr" || w === "night" || w === "drivers" || w === "in" || w === "load") { used = true; }
+      if (!used) rem.push(w);
+    }
+    if (cnt === 1 && times.length > 1) cnt = times.length;
+    var found = null;
+    for (var k in HUBS) {
+      if (pad.indexOf(" " + k + " ") !== -1 || pad.indexOf(" " + k + "s ") !== -1) { found = HUBS[k]; break; }
+    }
+    var q = rem.join(" ").trim();
+    if (!found && q && CACHE[q]) found = CACHE[q];
+    if (found) {
+      out.push({ name: found[0], lat: found[1], lon: found[2], reg: found[3], cnt: cnt, times: times, night: night, haz: haz });
+    } else if (q.length >= 2 && !isNum(q)) {
+      if (MISS[q]) missList.push(line); else pendList.push(q);
+    }
+  }
+  return out;
+}
+
+function merge(arr) {
+  var m = {}, res = [];
+  for (var i = 0; i < arr.length; i++) {
+    var x = arr[i];
+    if (!m[x.name]) { m[x.name] = { name: x.name, lat: x.lat, lon: x.lon, reg: x.reg, cnt: x.cnt, times: x.times.slice(), night: x.night, haz: x.haz }; }
+    else {
+      m[x.name].cnt += x.cnt;
+      if (x.night) m[x.name].night = true;
+      if (x.haz) m[x.name].haz = true;
+      for (var t = 0; t < x.times.length; t++) if (m[x.name].times.indexOf(x.times[t]) === -1) m[x.name].times.push(x.times[t]);
+    }
+  }
+  for (var k in m) res.push(m[k]);
+  return res;
+}
+
+function showTip(e, html, borderCol) {
+  var tip = document.getElementById("tooltip");
+  var wrap = document.getElementById("map-wrap").getBoundingClientRect();
+  tip.style.display = "block";
+  tip.style.borderColor = borderCol;
+  tip.style.left = (e.clientX - wrap.left + 16) + "px";
+  tip.style.top = (e.clientY - wrap.top - 12) + "px";
+  tip.innerHTML = html;
+}
+
+function hideTip() {
+  document.getElementById("tooltip").style.display = "none";
+}
+
+function run() {
+  var miss = [], pend = [];
+  var hubs = merge(parse(document.getElementById("avail").value, miss, pend));
+  hubs.sort(function(a, b) { return b.cnt - a.cnt; });
+
+  var lf = String.fromCharCode(10), cr = String.fromCharCode(13);
+  var rawL = document.getElementById("loads").value.split(cr).join(lf).split(",").join(lf).split(lf);
+  var lArr = [];
+  for (var i = 0; i < rawL.length; i++) if (rawL[i].trim()) lArr = lArr.concat(parse(rawL[i], miss, pend));
+  var loads = merge(lArr);
+
+  var pins = document.getElementById("pins"), lines = document.getElementById("lines");
+  var hList = document.getElementById("list-hubs"), lList = document.getElementById("list-loads");
+  var ns = "http://www.w3.org/2000/svg";
+  pins.innerHTML = ""; lines.innerHTML = ""; hList.innerHTML = ""; lList.innerHTML = "";
+
+  var uTot = 0, lTot = 0;
+  for (var a = 0; a < hubs.length; a++) uTot += hubs[a].cnt;
+  for (var b = 0; b < loads.length; b++) lTot += loads[b].cnt;
+  document.getElementById("s-units").textContent = uTot;
+  document.getElementById("s-hubs").textContent = hubs.length;
+  document.getElementById("s-loads").textContent = lTot;
+
+  for (var h = 0; h < hubs.length; h++) {
+    (function(hub) {
+      var p = pt(hub.lat, hub.lon);
+      var r = Math.min(13.5, 7 + hub.cnt * 1.3);
+      var col = hub.night ? "#a855f7" : (hub.times.length ? "#f59e0b" : "#38bdf8");
+
+      var pg = document.createElementNS(ns, "g");
+      pg.setAttribute("class", "pin-node");
+      pg.setAttribute("data-x", p.x.toFixed(2));
+      pg.setAttribute("data-y", p.y.toFixed(2));
+      pg.setAttribute("filter", "url(#pinShadow)");
+
+      var halo = document.createElementNS(ns, "circle");
+      halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 3.5);
+      halo.setAttribute("fill", col); halo.setAttribute("opacity", "0.24");
+      pg.appendChild(halo);
+
+      var c = document.createElementNS(ns, "circle");
+      c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
+      c.setAttribute("fill", col); c.setAttribute("stroke", "#090f1d"); c.setAttribute("stroke-width", "1.8");
+      pg.appendChild(c);
+
+      var tx = document.createElementNS(ns, "text");
+      tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
+      pg.appendChild(tx);
+
+      var labelStr = hub.name + (hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : ""));
+      var pillW = labelStr.length * 6.2 + 10;
+      var rect = document.createElementNS(ns, "rect");
+      rect.setAttribute("x", r + 5); rect.setAttribute("y", "-8");
+      rect.setAttribute("width", pillW); rect.setAttribute("height", "16");
+      rect.setAttribute("class", "lbl-bg");
+      pg.appendChild(rect);
+
+      var lb = document.createElementNS(ns, "text");
+      lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5"); lb.setAttribute("class", "lbl");
+      lb.textContent = labelStr;
+      pg.appendChild(lb);
+
+      pg.onmousemove = function(e) {
+        showTip(e, '<strong style="color:' + col + ';">' + hub.name + ' &mdash; ' + hub.cnt + ' Available</strong><div style="color:#94a3b8;margin-top:2px;">' + hub.reg + '</div>' + (hub.times.length ? '<div style="color:#fbbf24;margin-top:3px;">Waves: ' + hub.times.join(", ") + '</div>' : ''), col);
+      };
+      pg.onmouseleave = hideTip;
+
+      pins.appendChild(pg);
+
+      var card = document.createElement("div");
+      card.className = "card";
+      var cls = hub.night ? "tag n" : (hub.times.length ? "tag t" : "tag");
+      card.innerHTML = '<div><div class="card-title">' + hub.name + '</div><div class="card-sub">' + (hub.times.length ? "Waves: " + hub.times.join(", ") : hub.reg) + '</div></div><span class="' + cls + '">' + hub.cnt + 'x</span>';
+      hList.appendChild(card);
+    })(hubs[h]);
+  }
+
+  document.getElementById("hdr-loads").style.display = loads.length ? "block" : "none";
+  for (var l = 0; l < loads.length; l++) {
+    (function(ld) {
+      var lp = pt(ld.lat, ld.lon), col = ld.haz ? "#ef4444" : "#10b981";
+      var near = [];
+      for (var k = 0; k < hubs.length; k++) near.push({ name: hubs[k].name, cnt: hubs[k].cnt, lat: hubs[k].lat, lon: hubs[k].lon, mi: miles(ld, hubs[k]) });
+      near.sort(function(x, y) { return x.mi - y.mi; });
+      near = near.slice(0, 3);
+
+      for (var m = 0; m < near.length; m++) {
+        var hp = pt(near[m].lat, near[m].lon), ln = document.createElementNS(ns, "line");
+        var baseW = m === 0 ? "2.1" : "1.1";
+        ln.setAttribute("class", "conn-line");
+        ln.setAttribute("data-w", baseW);
+        ln.setAttribute("x1", lp.x); ln.setAttribute("y1", lp.y); ln.setAttribute("x2", hp.x); ln.setAttribute("y2", hp.y);
+        ln.setAttribute("stroke", col); ln.setAttribute("stroke-width", baseW); ln.setAttribute("stroke-dasharray", "4 3"); ln.setAttribute("opacity", m === 0 ? "0.9" : "0.4");
+        lines.appendChild(ln);
+      }
+
+      var lg = document.createElementNS(ns, "g");
+      lg.setAttribute("class", "pin-node");
+      lg.setAttribute("data-x", lp.x.toFixed(2));
+      lg.setAttribute("data-y", lp.y.toFixed(2));
+      lg.setAttribute("filter", "url(#pinShadow)");
+
+      var sz = ld.haz ? 11 : 9.5, poly = document.createElementNS(ns, "polygon");
+      poly.setAttribute("points", "0," + (-sz) + " " + sz + ",0 0," + sz + " " + (-sz) + ",0");
+      poly.setAttribute("fill", col); poly.setAttribute("stroke", ld.haz ? "#fbbf24" : "#ffffff"); poly.setAttribute("stroke-width", "1.8");
+      lg.appendChild(poly);
+
+      var ltx = document.createElementNS(ns, "text");
+      ltx.setAttribute("x", "0"); ltx.setAttribute("y", "0"); ltx.setAttribute("class", "cnt");
+      if (ld.haz) ltx.setAttribute("fill", "#ffffff");
+      ltx.textContent = ld.cnt;
+      lg.appendChild(ltx);
+
+      var lStr = (ld.haz ? "HAZ: " : "LOAD: ") + ld.name;
+      var lPillW = lStr.length * 6.4 + 10;
+      var lRect = document.createElementNS(ns, "rect");
+      lRect.setAttribute("x", sz + 5); lRect.setAttribute("y", "-8");
+      lRect.setAttribute("width", lPillW); lRect.setAttribute("height", "16");
+      lRect.setAttribute("class", ld.haz ? "lbl-bg h" : "lbl-bg g");
+      lg.appendChild(lRect);
+
+      var llb = document.createElementNS(ns, "text");
+      llb.setAttribute("x", sz + 10); llb.setAttribute("y", "3.5"); llb.setAttribute("class", ld.haz ? "lbl h" : "lbl g");
+      llb.textContent = lStr;
+      lg.appendChild(llb);
+
+      var nearHtml = near.length ? near.map(function(n) { return n.name + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
+      lg.onmousemove = function(e) {
+        showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + ld.name + ' (' + ld.cnt + 'x)</strong><div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
+      };
+      lg.onmouseleave = hideTip;
+
+      pins.appendChild(lg);
+
+      var lcard = document.createElement("div");
+      lcard.className = ld.haz ? "card ld hz" : "card ld";
+      var mTxt = near.length ? "Nearest: " + near.map(function(n) { return n.name + " (~" + n.mi + "m)"; }).join(" | ") : "No fleet available";
+      lcard.innerHTML = '<div><div class="card-title" style="color:' + (ld.haz ? "#fca5a5" : "#6ee7b7") + ';">' + ld.name + (ld.haz ? '<span class="tag h">&#9763; HAZ</span>' : '') + '</div><div class="card-sub" style="color:#cbd5e1;">' + mTxt + '</div></div><span class="tag g">' + ld.cnt + 'x</span>';
+      lList.appendChild(lcard);
+    })(loads[l]);
+  }
+
+  applyTransform();
+
+  var msg = document.getElementById("msg");
+  if (miss.length) { msg.style.display = "block"; msg.textContent = "Not found: " + miss.join(", "); }
+  else if (pend.length) { msg.style.display = "block"; msg.textContent = "Locating: " + pend.join(", ") + "..."; }
+  else { msg.style.display = "none"; }
+
+  if (pend.length) {
+    clearTimeout(timer);
+    timer = setTimeout(function() { for (var p = 0; p < pend.length; p++) lookup(pend[p]); }, 500);
+  }
+}
+
+run();
+pullFromCloud();
+setInterval(pullFromCloud, 2500);
+</script>
+</body>
+</html>
