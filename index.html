@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Areas + Locals)</title>
+<title>UK Transport Availability & Load Matcher (Haz Fleet)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #070d19; color: #f1f5f9; display: flex; height: 100vh; overflow: hidden; }
@@ -29,12 +29,11 @@
   textarea:focus { outline: none; border-color: #38bdf8; }
   #loads:focus { border-color: #34d399; }
 
-  .btns { display: flex; gap: 7px; }
+  .btns { display: flex; gap: 8px; }
   button { cursor: pointer; border: none; border-radius: 7px; padding: 8px 12px; font-size: 12px; font-weight: 600; transition: 0.15s; }
-  .btn-main { background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%); color: #04101f; flex: 1; font-weight: 700; }
-  .btn-main:hover { filter: brightness(1.08); }
-  .btn-sub { background: #162036; color: #94a3b8; border: 1px solid #24324d; }
-  .btn-sub:hover { color: #f8fafc; border-color: #3b4f75; }
+  .btn-sub { background: #162036; color: #cbd5e1; border: 1px solid #24324d; flex: 1; }
+  .btn-sub:hover { color: #f8fafc; border-color: #3b4f75; background: #1c2944; }
+  .btn-danger:hover { color: #fca5a5; border-color: rgba(239,68,68,0.5); }
 
   .msg { font-size: 11px; padding: 6px 9px; border-radius: 6px; display: none; background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); }
   .sec { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; }
@@ -42,7 +41,7 @@
   .card { background: #111a2e; border: 1px solid #1e293b; border-radius: 8px; padding: 8px 11px; display: flex; justify-content: space-between; align-items: center; gap: 8px; transition: border-color 0.15s; }
   .card:hover { border-color: #334155; }
   .card.ld { border-left: 3px solid #10b981; }
-  .card.hz { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.07); }
+  .card.hz { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.08); }
   .card-title { font-size: 13px; font-weight: 600; color: #f1f5f9; }
   .card-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
   .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(56,189,248,0.14); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); white-space: nowrap; }
@@ -84,6 +83,7 @@
   }
   .row { display: flex; align-items: center; gap: 8px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .dot.haz-ring { background: #38bdf8; border: 2px solid #ef4444; box-shadow: 0 0 8px #ef4444; }
   .dia { width: 9px; height: 9px; background: #10b981; transform: rotate(45deg); display: inline-block; }
   .dia.hz { background: #ef4444; border: 1px solid #fbbf24; }
 
@@ -133,7 +133,7 @@
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v16.0 AREAS</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v17.0 HAZ FLEET</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -141,17 +141,16 @@
     <div class="stat g"><b id="s-loads">0</b><span>Offers</span></div>
   </div>
   <div>
-    <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Towns, Postcodes, Locals, Areas</span></label>
-    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Locals x 3&#10;Midlands x 2&#10;Yorkshire&#10;Amesbury 0700, 1000"></textarea>
+    <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Supports "Haz" / "ADR"</span></label>
+    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Locals x 3&#10;Wolverhampton x 2 Haz&#10;Midlands&#10;Amesbury 0700, 1000"></textarea>
   </div>
   <div>
     <label><span>2. Potential Load Offers</span><span style="color:#34d399;font-size:11px;">Supports "Haz" / Areas</span></label>
     <textarea id="loads" oninput="onUserEdit()" placeholder="e.g. Northampton Haz, Yorkshire, Locals"></textarea>
   </div>
   <div class="btns">
-    <button type="button" class="btn-main" onclick="pushToCloud()">Sync Now</button>
     <button type="button" class="btn-sub" onclick="document.getElementById('loads').value='';onUserEdit()">Clear Loads</button>
-    <button type="button" class="btn-sub" onclick="document.getElementById('avail').value='';document.getElementById('loads').value='';onUserEdit()">Clear All</button>
+    <button type="button" class="btn-sub btn-danger" onclick="document.getElementById('avail').value='';document.getElementById('loads').value='';onUserEdit()">Clear All</button>
   </div>
   <div class="msg" id="msg"></div>
   <div class="sec" id="hdr-loads" style="display:none;color:#6ee7b7;">Offered Loads &amp; Nearest Fleet</div>
@@ -164,13 +163,14 @@
   <div class="legend">
     <b style="color:#f8fafc;font-size:12px;">Map Key</b>
     <div class="row"><span class="dot" style="background:#38bdf8;box-shadow:0 0 8px #38bdf8;"></span> Available Fleet</div>
+    <div class="row"><span class="dot haz-ring"></span> &#9763; ADR / Haz Driver</div>
     <div class="row"><span class="dot" style="background:#f59e0b;box-shadow:0 0 8px #f59e0b;"></span> Timed Wave</div>
     <div class="row"><span class="dot" style="background:#a855f7;box-shadow:0 0 8px #a855f7;"></span> Night Drivers</div>
     <div class="row"><span class="dia"></span> Standard Load</div>
-    <div class="row"><span class="dia hz"></span> &#9763; Hazardous / ADR</div>
+    <div class="row"><span class="dia hz"></span> &#9763; Hazardous / ADR Load</div>
   </div>
 
-  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Supports Locals, Midlands &amp; Yorkshire</div>
+  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Auto-syncs with crew</div>
   <div class="zoom-controls">
     <button type="button" class="zoom-btn" onclick="stepZoom(-0.45)" title="Zoom Out">&minus;</button>
     <span class="zoom-level" id="zoom-pct">100%</span>
@@ -208,7 +208,7 @@
 
 <script>
 // PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
-var DB_URL = "https://uk-transport-availability-default-rtdb.europe-west1.firebasedatabase.app";
+var DB_URL = "PASTE_YOUR_FIREBASE_URL_HERE";
 
 while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
   DB_URL = DB_URL.slice(0, -1);
@@ -446,7 +446,7 @@ var HUBS = {
 };
 
 var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "";
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v16") || "{}"); } catch (e) {}
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v17") || "{}"); } catch (e) {}
 
 function miles(a, b) {
   var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
@@ -563,7 +563,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v16", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v17", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -586,7 +586,7 @@ function parse(text, missList, pendList) {
       else if (isNum(w) && ((t + 1 < tok.length && tok[t + 1] === "x") || (t > 0 && tok[t - 1] === "x"))) { used = true; }
       else if (w.indexOf(":") !== -1 && w.length >= 4) { times.push(w); used = true; }
       else if (isNum(w) && w.length === 4) { times.push(w.slice(0, 2) + ":" + w.slice(2)); used = true; }
-      else if (w === "haz" || w === "adr" || w === "night" || w === "drivers" || w === "in" || w === "load") { used = true; }
+      else if (w === "haz" || w === "adr" || w === "night" || w === "drivers" || w === "driver" || w === "in" || w === "load") { used = true; }
       if (!used) rem.push(w);
     }
     if (cnt === 1 && times.length > 1) cnt = times.length;
@@ -671,43 +671,55 @@ function run() {
       pg.setAttribute("filter", "url(#pinShadow)");
 
       var halo = document.createElementNS(ns, "circle");
-      halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 3.5);
-      halo.setAttribute("fill", col); halo.setAttribute("opacity", "0.24");
+      halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 4);
+      halo.setAttribute("fill", hub.haz ? "#ef4444" : col); halo.setAttribute("opacity", hub.haz ? "0.35" : "0.24");
       pg.appendChild(halo);
 
       var c = document.createElementNS(ns, "circle");
       c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
-      c.setAttribute("fill", col); c.setAttribute("stroke", "#090f1d"); c.setAttribute("stroke-width", "1.8");
+      c.setAttribute("fill", col);
+      c.setAttribute("stroke", hub.haz ? "#ef4444" : "#090f1d");
+      c.setAttribute("stroke-width", hub.haz ? "2.4" : "1.8");
       pg.appendChild(c);
 
       var tx = document.createElementNS(ns, "text");
       tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
       pg.appendChild(tx);
 
-      var labelStr = hub.name + (hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : ""));
+      var hazSuffix = hub.haz ? " [HAZ]" : "";
+      var timeSuffix = hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : "");
+      var labelStr = hub.name + hazSuffix + timeSuffix;
       var pillW = labelStr.length * 6.2 + 10;
+
       var rect = document.createElementNS(ns, "rect");
       rect.setAttribute("x", r + 5); rect.setAttribute("y", "-8");
       rect.setAttribute("width", pillW); rect.setAttribute("height", "16");
-      rect.setAttribute("class", "lbl-bg");
+      rect.setAttribute("class", hub.haz ? "lbl-bg h" : "lbl-bg");
       pg.appendChild(rect);
 
       var lb = document.createElementNS(ns, "text");
-      lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5"); lb.setAttribute("class", "lbl");
+      lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5");
+      lb.setAttribute("class", hub.haz ? "lbl h" : "lbl");
       lb.textContent = labelStr;
       pg.appendChild(lb);
 
       pg.onmousemove = function(e) {
-        showTip(e, '<strong style="color:' + col + ';">' + hub.name + ' &mdash; ' + hub.cnt + ' Available</strong><div style="color:#94a3b8;margin-top:2px;">' + hub.reg + '</div>' + (hub.times.length ? '<div style="color:#fbbf24;margin-top:3px;">Waves: ' + hub.times.join(", ") + '</div>' : ''), col);
+        showTip(e,
+          '<strong style="color:' + (hub.haz ? "#fca5a5" : col) + ';">' + hub.name + ' &mdash; ' + hub.cnt + ' Available' + (hub.haz ? ' (&#9763; ADR/HAZ)' : '') + '</strong>' +
+          '<div style="color:#94a3b8;margin-top:2px;">' + hub.reg + '</div>' +
+          (hub.times.length ? '<div style="color:#fbbf24;margin-top:3px;">Waves: ' + hub.times.join(", ") + '</div>' : ''),
+          hub.haz ? "#ef4444" : col
+        );
       };
       pg.onmouseleave = hideTip;
 
       pins.appendChild(pg);
 
       var card = document.createElement("div");
-      card.className = "card";
+      card.className = hub.haz ? "card hz" : "card";
       var cls = hub.night ? "tag n" : (hub.times.length ? "tag t" : "tag");
-      card.innerHTML = '<div><div class="card-title">' + hub.name + '</div><div class="card-sub">' + (hub.times.length ? "Waves: " + hub.times.join(", ") : hub.reg) + '</div></div><span class="' + cls + '">' + hub.cnt + 'x</span>';
+      var hazPill = hub.haz ? '<span class="tag h">&#9763; HAZ</span>' : '';
+      card.innerHTML = '<div><div class="card-title">' + hub.name + hazPill + '</div><div class="card-sub">' + (hub.times.length ? "Waves: " + hub.times.join(", ") : hub.reg) + '</div></div><span class="' + cls + '">' + hub.cnt + 'x</span>';
       hList.appendChild(card);
     })(hubs[h]);
   }
@@ -717,7 +729,17 @@ function run() {
     (function(ld) {
       var lp = pt(ld.lat, ld.lon), col = ld.haz ? "#ef4444" : "#10b981";
       var near = [];
-      for (var k = 0; k < hubs.length; k++) near.push({ name: hubs[k].name, cnt: hubs[k].cnt, lat: hubs[k].lat, lon: hubs[k].lon, mi: miles(ld, hubs[k]) });
+      for (var k = 0; k < hubs.length; k++) {
+        // If load is Haz, prioritize Haz-certified fleet first, then sort by distance
+        if (ld.haz && !hubs[k].haz) continue;
+        near.push({ name: hubs[k].name, cnt: hubs[k].cnt, lat: hubs[k].lat, lon: hubs[k].lon, haz: hubs[k].haz, mi: miles(ld, hubs[k]) });
+      }
+      // Fallback to all fleet if no Haz-tagged driver is currently listed
+      if (ld.haz && near.length === 0) {
+        for (var k2 = 0; k2 < hubs.length; k2++) {
+          near.push({ name: hubs[k2].name, cnt: hubs[k2].cnt, lat: hubs[k2].lat, lon: hubs[k2].lon, haz: false, mi: miles(ld, hubs[k2]) });
+        }
+      }
       near.sort(function(x, y) { return x.mi - y.mi; });
       near = near.slice(0, 3);
 
@@ -761,7 +783,7 @@ function run() {
       llb.textContent = lStr;
       lg.appendChild(llb);
 
-      var nearHtml = near.length ? near.map(function(n) { return n.name + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
+      var nearHtml = near.length ? near.map(function(n) { return n.name + (n.haz ? " [HAZ]" : "") + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
       lg.onmousemove = function(e) {
         showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + ld.name + ' (' + ld.cnt + 'x)</strong><div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
       };
@@ -771,7 +793,9 @@ function run() {
 
       var lcard = document.createElement("div");
       lcard.className = ld.haz ? "card ld hz" : "card ld";
-      var mTxt = near.length ? "Nearest: " + near.map(function(n) { return n.name + " (~" + n.mi + "m)"; }).join(" | ") : "No fleet available";
+      var mTxt = near.length
+        ? (ld.haz && !near[0].haz ? "Nearest (non-ADR): " : "Nearest: ") + near.map(function(n) { return n.name + " (~" + n.mi + "m)"; }).join(" | ")
+        : "No fleet available";
       lcard.innerHTML = '<div><div class="card-title" style="color:' + (ld.haz ? "#fca5a5" : "#6ee7b7") + ';">' + ld.name + (ld.haz ? '<span class="tag h">&#9763; HAZ</span>' : '') + '</div><div class="card-sub" style="color:#cbd5e1;">' + mTxt + '</div></div><span class="tag g">' + ld.cnt + 'x</span>';
       lList.appendChild(lcard);
     })(loads[l]);
