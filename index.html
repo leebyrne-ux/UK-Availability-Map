@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Crew Chat)</title>
+<title>UK Transport Availability & Load Matcher (Load Status)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #070d19; color: #f1f5f9; display: flex; height: 100vh; overflow: hidden; }
 
-  .sidebar { width: 410px; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 14px 16px; gap: 9px; overflow-y: auto; z-index: 10; box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
+  .sidebar { width: 415px; background: #0f172a; border-right: 1px solid #1e293b; display: flex; flex-direction: column; padding: 14px 16px; gap: 9px; overflow-y: auto; z-index: 10; box-shadow: 4px 0 24px rgba(0,0,0,0.4); }
   .header { display: flex; justify-content: space-between; align-items: center; }
   .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: #f8fafc; }
   .pill { font-size: 10px; font-weight: 700; color: #34d399; background: rgba(16,185,129,0.12); border: 1px solid rgba(52,211,153,0.35); padding: 3px 9px; border-radius: 99px; letter-spacing: 0.03em; }
@@ -24,8 +24,8 @@
 
   label { font-size: 11.5px; font-weight: 600; color: #cbd5e1; display: flex; justify-content: space-between; margin-bottom: 4px; }
   textarea, input[type="text"] { width: 100%; background: #090f1d; color: #f8fafc; border: 1px solid #1e293b; border-radius: 7px; padding: 7px 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.4; transition: border-color 0.15s; }
-  #avail { height: 105px; resize: vertical; }
-  #loads { height: 56px; resize: vertical; border-color: rgba(16,185,129,0.35); }
+  #avail { height: 100px; resize: vertical; }
+  #loads { height: 54px; resize: vertical; border-color: rgba(16,185,129,0.35); }
   textarea:focus, input[type="text"]:focus { outline: none; border-color: #38bdf8; }
   #loads:focus { border-color: #34d399; }
 
@@ -39,29 +39,63 @@
 
   .msg { font-size: 11px; padding: 5px 9px; border-radius: 6px; display: none; background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.35); }
   .sec { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; margin-top: 2px; display: flex; justify-content: space-between; align-items: center; }
-  .list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; max-height: 165px; padding-right: 2px; }
-  .card { background: #111a2e; border: 1px solid #1e293b; border-radius: 7px; padding: 7px 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; transition: border-color 0.15s; }
+  .list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; max-height: 155px; padding-right: 2px; }
+  .card { background: #111a2e; border: 1px solid #1e293b; border-radius: 7px; padding: 7px 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; transition: 0.15s; }
   .card:hover { border-color: #334155; }
   .card.ld { border-left: 3px solid #10b981; }
   .card.hz { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.08); }
-  .card-title { font-size: 12.5px; font-weight: 600; color: #f1f5f9; }
-  .card-sub { font-size: 10.5px; color: #94a3b8; margin-top: 1px; }
+
+  /* Load Offer Status States (Uncovered = Red X, Booked = Green Tick) */
+  .card.ld.uncovered { border-color: rgba(239,68,68,0.45); border-left: 3px solid #ef4444; background: rgba(239,68,68,0.12); }
+  .card.ld.uncovered .card-title { color: #f87171 !important; text-decoration: line-through; }
+  .card.ld.uncovered .card-sub { color: #fca5a5 !important; }
+  .card.ld.booked { border-color: rgba(16,185,129,0.65); border-left: 3px solid #10b981; background: rgba(16,185,129,0.14); }
+  .card.ld.booked .card-title { color: #34d399 !important; }
+
+  .load-mid { flex: 1; min-width: 0; }
+  .card-title { font-size: 12.5px; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  .card-sub { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
+
+  /* Red X (Left) & Green Tick (Right) Action Checkboxes */
+  .status-chk {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    padding: 0;
+    flex-shrink: 0;
+    border: 1.5px solid #334155;
+    background: #090f1d;
+    color: #64748b;
+  }
+  .status-chk.no-btn:hover { border-color: #ef4444; color: #f87171; background: rgba(239,68,68,0.12); }
+  .status-chk.no-btn.active { background: #ef4444; border-color: #ef4444; color: #ffffff; box-shadow: 0 0 10px rgba(239,68,68,0.45); }
+
+  .status-chk.ok-btn:hover { border-color: #10b981; color: #34d399; background: rgba(16,185,129,0.12); }
+  .status-chk.ok-btn.active { background: #10b981; border-color: #10b981; color: #04101f; box-shadow: 0 0 10px rgba(16,185,129,0.45); }
+
   .tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: rgba(56,189,248,0.14); color: #38bdf8; border: 1px solid rgba(56,189,248,0.35); white-space: nowrap; }
   .tag.t { color: #fbbf24; background: rgba(245,158,11,0.14); border-color: rgba(245,158,11,0.35); }
   .tag.n { color: #c084fc; background: rgba(168,85,247,0.14); border-color: rgba(168,85,247,0.35); }
   .tag.g { color: #34d399; background: rgba(16,185,129,0.14); border-color: rgba(16,185,129,0.35); }
-  .tag.h { color: #fca5a5; background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.55); font-size: 10px; padding: 1px 6px; margin-left: 5px; }
+  .tag.h { color: #fca5a5; background: rgba(239,68,68,0.22); border-color: rgba(239,68,68,0.55); font-size: 9.5px; padding: 1px 5px; }
+  .tag.bk { color: #04101f; background: #34d399; border-color: #34d399; font-size: 9.5px; padding: 1px 6px; }
+  .tag.nc { color: #ffffff; background: #ef4444; border-color: #ef4444; font-size: 9.5px; padding: 1px 6px; }
 
   /* Crew Chat Box */
   .chat-box { background: #090f1d; border: 1px solid #1e293b; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
-  .chat-feed { max-height: 115px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; padding-right: 2px; }
+  .chat-feed { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; padding-right: 2px; }
   .chat-empty { color: #475569; font-size: 11px; text-align: center; padding: 10px 4px; }
   .chat-item { background: #111a2e; border: 1px solid #1e293b; border-radius: 6px; padding: 5px 8px; line-height: 1.35; }
   .chat-meta { display: flex; justify-content: space-between; font-size: 10px; color: #38bdf8; font-weight: 700; margin-bottom: 2px; }
   .chat-meta span { color: #64748b; font-weight: 500; }
   .chat-text { color: #e2e8f0; word-break: break-word; }
   .chat-row { display: flex; gap: 5px; }
-  .chat-name { width: 78px !important; flex-shrink: 0; font-family: inherit; font-size: 11.5px; }
+  .chat-name { width: 76px !important; flex-shrink: 0; font-family: inherit; font-size: 11.5px; }
   .chat-input { flex: 1; font-family: inherit; font-size: 11.5px; }
   .link-clear { background: none; border: none; color: #64748b; font-size: 10px; padding: 0; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
   .link-clear:hover { color: #fca5a5; }
@@ -149,7 +183,7 @@
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v18.0 CREW CHAT</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v19.0 LOAD STATUS</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -161,15 +195,18 @@
     <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Locals x 3&#10;Wolverhampton x 2 Haz&#10;Midlands&#10;Amesbury 0700, 1000"></textarea>
   </div>
   <div>
-    <label><span>2. Potential Load Offers</span><span style="color:#34d399;font-size:11px;">Supports "Haz" / Areas</span></label>
+    <label><span>2. Potential Load Offers</span><span style="color:#34d399;font-size:11px;">&#10005; No Cover &bull; &#10003; Booked</span></label>
     <textarea id="loads" oninput="onUserEdit()" placeholder="e.g. Northampton Haz, Yorkshire, Locals"></textarea>
   </div>
   <div class="btns">
-    <button type="button" class="btn-sub" onclick="document.getElementById('loads').value='';onUserEdit()">Clear Loads</button>
-    <button type="button" class="btn-sub btn-danger" onclick="document.getElementById('avail').value='';document.getElementById('loads').value='';onUserEdit()">Clear All</button>
+    <button type="button" class="btn-sub" onclick="clearLoadsOnly()">Clear Loads</button>
+    <button type="button" class="btn-sub btn-danger" onclick="clearAllBoard()">Clear All</button>
   </div>
   <div class="msg" id="msg"></div>
-  <div class="sec" id="hdr-loads" style="display:none;color:#6ee7b7;">Offered Loads &amp; Nearest Fleet</div>
+  <div class="sec" id="hdr-loads" style="display:none;color:#6ee7b7;">
+    <span>Offered Loads</span>
+    <span style="font-size:9.5px;color:#94a3b8;font-weight:600;">&#10005; NO COVER &nbsp;|&nbsp; &#10003; BOOKED</span>
+  </div>
   <div id="list-loads" style="display:flex;flex-direction:column;gap:5px;"></div>
   <div class="sec">Available Fleet Hubs</div>
   <div class="list" id="list-hubs"></div>
@@ -198,8 +235,8 @@
     <div class="row"><span class="dot haz-ring"></span> &#9763; ADR / Haz Driver</div>
     <div class="row"><span class="dot" style="background:#f59e0b;box-shadow:0 0 8px #f59e0b;"></span> Timed Wave</div>
     <div class="row"><span class="dot" style="background:#a855f7;box-shadow:0 0 8px #a855f7;"></span> Night Drivers</div>
-    <div class="row"><span class="dia"></span> Standard Load</div>
-    <div class="row"><span class="dia hz"></span> &#9763; Hazardous / ADR Load</div>
+    <div class="row"><span class="dia"></span> Standard / Booked Load</div>
+    <div class="row"><span class="dia hz"></span> &#9763; Haz / Uncovered Load</div>
   </div>
 
   <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Auto-syncs with crew</div>
@@ -484,8 +521,8 @@ var HUBS = {
   "kings lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"], "king s lynn":["King's Lynn",52.7543,0.3976,"Norfolk (A47/A10)"]
 };
 
-var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "", chatMessages = [];
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v18") || "{}"); } catch (e) {}
+var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "", chatMessages = [], loadStatuses = {};
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v19") || "{}"); } catch (e) {}
 
 function miles(a, b) {
   var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
@@ -521,6 +558,29 @@ function shortTime() {
 
 function escHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function toggleLoadStatus(loadName, targetState) {
+  if (loadStatuses[loadName] === targetState) {
+    delete loadStatuses[loadName];
+  } else {
+    loadStatuses[loadName] = targetState;
+  }
+  run();
+  pushToCloud();
+}
+
+function clearLoadsOnly() {
+  document.getElementById("loads").value = "";
+  loadStatuses = {};
+  onUserEdit();
+}
+
+function clearAllBoard() {
+  document.getElementById("avail").value = "";
+  document.getElementById("loads").value = "";
+  loadStatuses = {};
+  onUserEdit();
 }
 
 function renderChat() {
@@ -583,12 +643,12 @@ function pushToCloud() {
   setSyncState("SAVING...", "busy", "Sending update to crew...");
   var aVal = document.getElementById("avail").value;
   var lVal = document.getElementById("loads").value;
-  lastSnapshot = aVal + "|||" + lVal + "|||" + JSON.stringify(chatMessages);
+  lastSnapshot = aVal + "|||" + lVal + "|||" + JSON.stringify(loadStatuses) + "|||" + JSON.stringify(chatMessages);
 
   fetch(DB_URL + "/board.json", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ avail: aVal, loads: lVal, chat: chatMessages, updated: Date.now() })
+    body: JSON.stringify({ avail: aVal, loads: lVal, statuses: loadStatuses, chat: chatMessages, updated: Date.now() })
   }).then(function(r) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     setSyncState("CREW LIVE", "", "Saved & shared with crew");
@@ -611,12 +671,14 @@ function pullFromCloud() {
       }
       var remoteA = data.avail || "";
       var remoteL = data.loads || "";
+      var remoteSt = (data.statuses && typeof data.statuses === "object") ? data.statuses : {};
       var remoteChat = Array.isArray(data.chat) ? data.chat : [];
-      var snap = remoteA + "|||" + remoteL + "|||" + JSON.stringify(remoteChat);
+      var snap = remoteA + "|||" + remoteL + "|||" + JSON.stringify(remoteSt) + "|||" + JSON.stringify(remoteChat);
       if (snap !== lastSnapshot) {
         lastSnapshot = snap;
         document.getElementById("avail").value = remoteA;
         document.getElementById("loads").value = remoteL;
+        loadStatuses = remoteSt;
         chatMessages = remoteChat;
         run();
         renderChat();
@@ -649,7 +711,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v18", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v19", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -810,10 +872,16 @@ function run() {
     })(hubs[h]);
   }
 
-  document.getElementById("hdr-loads").style.display = loads.length ? "block" : "none";
+  document.getElementById("hdr-loads").style.display = loads.length ? "flex" : "none";
   for (var l = 0; l < loads.length; l++) {
     (function(ld) {
-      var lp = pt(ld.lat, ld.lon), col = ld.haz ? "#ef4444" : "#10b981";
+      var st = loadStatuses[ld.name] || "";
+      var isNo = (st === "no");
+      var isOk = (st === "ok");
+
+      var lp = pt(ld.lat, ld.lon);
+      var col = isNo ? "#ef4444" : (ld.haz ? "#ef4444" : "#10b981");
+
       var near = [];
       for (var k = 0; k < hubs.length; k++) {
         if (ld.haz && !hubs[k].haz) continue;
@@ -833,7 +901,10 @@ function run() {
         ln.setAttribute("class", "conn-line");
         ln.setAttribute("data-w", baseW);
         ln.setAttribute("x1", lp.x); ln.setAttribute("y1", lp.y); ln.setAttribute("x2", hp.x); ln.setAttribute("y2", hp.y);
-        ln.setAttribute("stroke", col); ln.setAttribute("stroke-width", baseW); ln.setAttribute("stroke-dasharray", "4 3"); ln.setAttribute("opacity", m === 0 ? "0.9" : "0.4");
+        ln.setAttribute("stroke", col);
+        ln.setAttribute("stroke-width", baseW);
+        if (!isOk) ln.setAttribute("stroke-dasharray", "4 3");
+        ln.setAttribute("opacity", isNo ? "0.22" : (m === 0 ? "0.92" : "0.4"));
         lines.appendChild(ln);
       }
 
@@ -842,46 +913,82 @@ function run() {
       lg.setAttribute("data-x", lp.x.toFixed(2));
       lg.setAttribute("data-y", lp.y.toFixed(2));
       lg.setAttribute("filter", "url(#pinShadow)");
+      if (isNo) lg.setAttribute("opacity", "0.65");
 
       var sz = ld.haz ? 11 : 9.5, poly = document.createElementNS(ns, "polygon");
       poly.setAttribute("points", "0," + (-sz) + " " + sz + ",0 0," + sz + " " + (-sz) + ",0");
-      poly.setAttribute("fill", col); poly.setAttribute("stroke", ld.haz ? "#fbbf24" : "#ffffff"); poly.setAttribute("stroke-width", "1.8");
+      poly.setAttribute("fill", col);
+      poly.setAttribute("stroke", isOk ? "#34d399" : (ld.haz ? "#fbbf24" : "#ffffff"));
+      poly.setAttribute("stroke-width", isOk ? "2.4" : "1.8");
       lg.appendChild(poly);
 
       var ltx = document.createElementNS(ns, "text");
       ltx.setAttribute("x", "0"); ltx.setAttribute("y", "0"); ltx.setAttribute("class", "cnt");
-      if (ld.haz) ltx.setAttribute("fill", "#ffffff");
-      ltx.textContent = ld.cnt;
+      if (ld.haz || isNo) ltx.setAttribute("fill", "#ffffff");
+      ltx.textContent = isNo ? "\u2715" : (isOk ? "\u2713" : ld.cnt);
       lg.appendChild(ltx);
 
-      var lStr = (ld.haz ? "HAZ: " : "LOAD: ") + ld.name;
+      var prefix = isNo ? "NO COVER: " : (isOk ? "BOOKED: " : (ld.haz ? "HAZ: " : "LOAD: "));
+      var lStr = prefix + ld.name;
       var lPillW = lStr.length * 6.4 + 10;
       var lRect = document.createElementNS(ns, "rect");
       lRect.setAttribute("x", sz + 5); lRect.setAttribute("y", "-8");
       lRect.setAttribute("width", lPillW); lRect.setAttribute("height", "16");
-      lRect.setAttribute("class", ld.haz ? "lbl-bg h" : "lbl-bg g");
+      lRect.setAttribute("class", (ld.haz || isNo) ? "lbl-bg h" : "lbl-bg g");
       lg.appendChild(lRect);
 
       var llb = document.createElementNS(ns, "text");
-      llb.setAttribute("x", sz + 10); llb.setAttribute("y", "3.5"); llb.setAttribute("class", ld.haz ? "lbl h" : "lbl g");
+      llb.setAttribute("x", sz + 10); llb.setAttribute("y", "3.5");
+      llb.setAttribute("class", (ld.haz || isNo) ? "lbl h" : "lbl g");
       llb.textContent = lStr;
       lg.appendChild(llb);
 
       var nearHtml = near.length ? near.map(function(n) { return n.name + (n.haz ? " [HAZ]" : "") + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
+      var statusNote = isNo ? '<div style="color:#f87171;font-weight:700;margin-top:2px;">&#10005; Marked Cannot Cover</div>'
+                     : isOk ? '<div style="color:#34d399;font-weight:700;margin-top:2px;">&#10003; Confirmed &amp; Booked</div>' : '';
       lg.onmousemove = function(e) {
-        showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + ld.name + ' (' + ld.cnt + 'x)</strong><div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
+        showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + ld.name + ' (' + ld.cnt + 'x)</strong>' + statusNote + '<div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
       };
       lg.onmouseleave = hideTip;
 
       pins.appendChild(lg);
 
-      var lcard = document.createElement("div");
-      lcard.className = ld.haz ? "card ld hz" : "card ld";
-      var mTxt = near.length
-        ? (ld.haz && !near[0].haz ? "Nearest (non-ADR): " : "Nearest: ") + near.map(function(n) { return n.name + " (~" + n.mi + "m)"; }).join(" | ")
-        : "No fleet available";
-      lcard.innerHTML = '<div><div class="card-title" style="color:' + (ld.haz ? "#fca5a5" : "#6ee7b7") + ';">' + ld.name + (ld.haz ? '<span class="tag h">&#9763; HAZ</span>' : '') + '</div><div class="card-sub" style="color:#cbd5e1;">' + mTxt + '</div></div><span class="tag g">' + ld.cnt + 'x</span>';
-      lList.appendChild(lcard);
+      // Build Sidebar Load Card with Red X on Left and Green Tick on Right
+      var card = document.createElement("div");
+      card.className = "card ld" + (ld.haz && !isNo && !isOk ? " hz" : "") + (isNo ? " uncovered" : "") + (isOk ? " booked" : "");
+
+      var noBtn = document.createElement("button");
+      noBtn.type = "button";
+      noBtn.className = "status-chk no-btn" + (isNo ? " active" : "");
+      noBtn.title = "Cannot Cover (Red X)";
+      noBtn.innerHTML = "&#10005;";
+      noBtn.onclick = function() { toggleLoadStatus(ld.name, "no"); };
+
+      var mid = document.createElement("div");
+      mid.className = "load-mid";
+      var mTxt = isNo ? "Cannot cover (marked by Ops)"
+               : isOk ? "Confirmed / Booked"
+               : (near.length ? (ld.haz && !near[0].haz ? "Nearest (non-ADR): " : "Nearest: ") + near.map(function(n) { return n.name + " (~" + n.mi + "m)"; }).join(" | ") : "No fleet available");
+
+      var statusBadge = isNo ? '<span class="tag nc">&#10005; NO COVER</span>'
+                      : isOk ? '<span class="tag bk">&#10003; BOOKED</span>' : '';
+      var hazBadge = ld.haz ? '<span class="tag h">&#9763; HAZ</span>' : '';
+
+      mid.innerHTML = '<div class="card-title" style="color:' + (ld.haz ? "#fca5a5" : "#6ee7b7") + ';">' +
+                      escHtml(ld.name) + ' (' + ld.cnt + 'x)' + hazBadge + statusBadge +
+                      '</div><div class="card-sub">' + escHtml(mTxt) + '</div>';
+
+      var okBtn = document.createElement("button");
+      okBtn.type = "button";
+      okBtn.className = "status-chk ok-btn" + (isOk ? " active" : "");
+      okBtn.title = "Load Confirmed / Booked (Green Tick)";
+      okBtn.innerHTML = "&#10003;";
+      okBtn.onclick = function() { toggleLoadStatus(ld.name, "ok"); };
+
+      card.appendChild(noBtn);
+      card.appendChild(mid);
+      card.appendChild(okBtn);
+      lList.appendChild(card);
     })(loads[l]);
   }
 
