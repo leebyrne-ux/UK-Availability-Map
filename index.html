@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Load Status)</title>
+<title>UK Transport Availability & Load Matcher (Auto-Reset)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #070d19; color: #f1f5f9; display: flex; height: 100vh; overflow: hidden; }
@@ -45,7 +45,6 @@
   .card.ld { border-left: 3px solid #10b981; }
   .card.hz { border-left: 3px solid #ef4444; background: rgba(239,68,68,0.08); }
 
-  /* Load Offer Status States (Uncovered = Red X, Booked = Green Tick) */
   .card.ld.uncovered { border-color: rgba(239,68,68,0.45); border-left: 3px solid #ef4444; background: rgba(239,68,68,0.12); }
   .card.ld.uncovered .card-title { color: #f87171 !important; text-decoration: line-through; }
   .card.ld.uncovered .card-sub { color: #fca5a5 !important; }
@@ -56,7 +55,6 @@
   .card-title { font-size: 12.5px; font-weight: 600; color: #f1f5f9; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
   .card-sub { font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
 
-  /* Red X (Left) & Green Tick (Right) Action Checkboxes */
   .status-chk {
     width: 24px;
     height: 24px;
@@ -86,7 +84,6 @@
   .tag.bk { color: #04101f; background: #34d399; border-color: #34d399; font-size: 9.5px; padding: 1px 6px; }
   .tag.nc { color: #ffffff; background: #ef4444; border-color: #ef4444; font-size: 9.5px; padding: 1px 6px; }
 
-  /* Crew Chat Box */
   .chat-box { background: #090f1d; border: 1px solid #1e293b; border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px; margin-top: auto; }
   .chat-feed { max-height: 110px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; padding-right: 2px; }
   .chat-empty { color: #475569; font-size: 11px; text-align: center; padding: 10px 4px; }
@@ -183,7 +180,7 @@
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v19.0 LOAD STATUS</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v20.0 AUTO-RESET</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -277,7 +274,7 @@
 
 <script>
 // PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
-var DB_URL = "https://uk-transport-availability-default-rtdb.europe-west1.firebasedatabase.app";
+var DB_URL = "PASTE_YOUR_FIREBASE_URL_HERE";
 
 while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
   DB_URL = DB_URL.slice(0, -1);
@@ -522,7 +519,7 @@ var HUBS = {
 };
 
 var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "", chatMessages = [], loadStatuses = {};
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v19") || "{}"); } catch (e) {}
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v20") || "{}"); } catch (e) {}
 
 function miles(a, b) {
   var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
@@ -711,7 +708,7 @@ function lookup(q) {
     } else {
       MISS[q] = true;
     }
-    try { localStorage.setItem("uk_geo_v19", JSON.stringify(CACHE)); } catch (e) {}
+    try { localStorage.setItem("uk_geo_v20", JSON.stringify(CACHE)); } catch (e) {}
     run();
   }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
 }
@@ -793,6 +790,15 @@ function run() {
   var lArr = [];
   for (var i = 0; i < rawL.length; i++) if (rawL[i].trim()) lArr = lArr.concat(parse(rawL[i], miss, pend));
   var loads = merge(lArr);
+
+  // Auto-prune saved statuses for any loads removed from the list so future entries start clean
+  if (pend.length === 0) {
+    var activeNames = {};
+    for (var ac = 0; ac < loads.length; ac++) activeNames[loads[ac].name] = true;
+    for (var stKey in loadStatuses) {
+      if (!activeNames[stKey]) delete loadStatuses[stKey];
+    }
+  }
 
   var pins = document.getElementById("pins"), lines = document.getElementById("lines");
   var hList = document.getElementById("list-hubs"), lList = document.getElementById("list-loads");
@@ -953,7 +959,6 @@ function run() {
 
       pins.appendChild(lg);
 
-      // Build Sidebar Load Card with Red X on Left and Green Tick on Right
       var card = document.createElement("div");
       card.className = "card ld" + (ld.haz && !isNo && !isOk ? " hz" : "") + (isNo ? " uncovered" : "") + (isOk ? " booked" : "");
 
