@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>UK Transport Availability & Load Matcher (Auto-Reset)</title>
+<title>UK Transport Availability & Load Matcher (Split Pins)</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Inter", system-ui, -apple-system, sans-serif; background: #070d19; color: #f1f5f9; display: flex; height: 100vh; overflow: hidden; }
@@ -25,7 +25,7 @@
   label { font-size: 11.5px; font-weight: 600; color: #cbd5e1; display: flex; justify-content: space-between; margin-bottom: 4px; }
   textarea, input[type="text"] { width: 100%; background: #090f1d; color: #f8fafc; border: 1px solid #1e293b; border-radius: 7px; padding: 7px 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.4; transition: border-color 0.15s; }
   #avail { height: 100px; resize: vertical; }
-  #loads { height: 54px; resize: vertical; border-color: rgba(16,185,129,0.35); }
+  #loads { height: 62px; resize: vertical; border-color: rgba(16,185,129,0.35); }
   textarea:focus, input[type="text"]:focus { outline: none; border-color: #38bdf8; }
   #loads:focus { border-color: #34d399; }
 
@@ -131,6 +131,7 @@
   .row { display: flex; align-items: center; gap: 8px; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .dot.haz-ring { background: #38bdf8; border: 2px solid #ef4444; box-shadow: 0 0 8px #ef4444; }
+  .dot.split-demo { background: linear-gradient(90deg, #38bdf8 50%, #10b981 50%); border: 1px solid #090f1d; }
   .dia { width: 9px; height: 9px; background: #10b981; transform: rotate(45deg); display: inline-block; }
   .dia.hz { background: #ef4444; border: 1px solid #fbbf24; }
 
@@ -165,22 +166,24 @@
     box-shadow: 0 10px 28px rgba(0,0,0,0.6);
     display: none;
     z-index: 25;
-    min-width: 175px;
+    min-width: 185px;
   }
 
   .pin-node { cursor: pointer; }
-  .lbl-bg { fill: rgba(9, 15, 29, 0.86); stroke: rgba(51, 65, 85, 0.7); stroke-width: 0.8px; rx: 4; ry: 4; }
+  .lbl-bg { fill: rgba(9, 15, 29, 0.88); stroke: rgba(51, 65, 85, 0.75); stroke-width: 0.8px; rx: 4; ry: 4; }
   .lbl-bg.g { stroke: rgba(16, 185, 129, 0.55); }
   .lbl-bg.h { fill: rgba(69, 10, 10, 0.92); stroke: rgba(239, 68, 68, 0.8); }
+  .lbl-bg.split { stroke: rgba(56, 189, 248, 0.65); }
   .lbl { font-size: 10.5px; font-weight: 600; fill: #f8fafc; }
   .lbl.g { fill: #6ee7b7; font-weight: 700; }
   .lbl.h { fill: #fecaca; font-weight: 700; }
   .cnt { font-size: 9.5px; font-weight: 800; fill: #04101f; text-anchor: middle; dominant-baseline: central; }
+  .cnt-sm { font-size: 8.5px; font-weight: 800; fill: #04101f; text-anchor: middle; dominant-baseline: central; }
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v20.0 AUTO-RESET</span></div>
+  <div class="header"><h1>UK Transport Board</h1><span class="pill" id="status">v22.0 SPLIT PINS</span></div>
   <div class="sync-bar"><span id="sync-info">Connecting to crew board...</span><span id="last-time">--:--</span></div>
   <div class="stats">
     <div class="stat"><b id="s-units">0</b><span>Available</span></div>
@@ -188,12 +191,12 @@
     <div class="stat g"><b id="s-loads">0</b><span>Offers</span></div>
   </div>
   <div>
-    <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Supports "Haz" / "ADR"</span></label>
-    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Locals x 3&#10;Wolverhampton x 2 Haz&#10;Midlands&#10;Amesbury 0700, 1000"></textarea>
+    <label><span>1. Crew Fleet Availability</span><span style="color:#38bdf8;font-size:11px;">Towns, Postcodes, Locals</span></label>
+    <textarea id="avail" oninput="onUserEdit()" placeholder="e.g. Northampton x 4&#10;Wolverhampton x 2 Haz&#10;Midlands"></textarea>
   </div>
   <div>
-    <label><span>2. Potential Load Offers</span><span style="color:#34d399;font-size:11px;">&#10005; No Cover &bull; &#10003; Booked</span></label>
-    <textarea id="loads" oninput="onUserEdit()" placeholder="e.g. Northampton Haz, Yorkshire, Locals"></textarea>
+    <label><span>2. Potential Load Offers (1 per line)</span><span style="color:#34d399;font-size:11px;">Business names / Postcodes</span></label>
+    <textarea id="loads" oninput="onUserEdit()" placeholder="e.g. Northampton&#10;DHL Crick&#10;NN4 7YB"></textarea>
   </div>
   <div class="btns">
     <button type="button" class="btn-sub" onclick="clearLoadsOnly()">Clear Loads</button>
@@ -208,7 +211,6 @@
   <div class="sec">Available Fleet Hubs</div>
   <div class="list" id="list-hubs"></div>
 
-  <!-- Live Crew Notes / Message Box -->
   <div class="chat-box">
     <div class="sec">
       <span>Crew Notes &amp; Messages</span>
@@ -234,9 +236,10 @@
     <div class="row"><span class="dot" style="background:#a855f7;box-shadow:0 0 8px #a855f7;"></span> Night Drivers</div>
     <div class="row"><span class="dia"></span> Standard / Booked Load</div>
     <div class="row"><span class="dia hz"></span> &#9763; Haz / Uncovered Load</div>
+    <div class="row"><span class="dot split-demo"></span> Split Pin (Same Location)</div>
   </div>
 
-  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Auto-syncs with crew</div>
+  <div class="zoom-hint">Scroll wheel to zoom &bull; Drag to pan &bull; Split pins show overlapping fleet &amp; loads</div>
   <div class="zoom-controls">
     <button type="button" class="zoom-btn" onclick="stepZoom(-0.45)" title="Zoom Out">&minus;</button>
     <span class="zoom-level" id="zoom-pct">100%</span>
@@ -273,8 +276,11 @@
 </div>
 
 <script>
-// PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
-var DB_URL = "https://uk-transport-availability-default-rtdb.europe-west1.firebasedatabase.app";
+// 1. PASTE YOUR FIREBASE REALTIME DATABASE URL BELOW:
+var DB_URL = "PASTE_YOUR_FIREBASE_URL_HERE";
+
+// 2. OPTIONAL: PASTE YOUR GOOGLE PLACES API KEY BELOW FOR EXACT BUSINESS NAME LOOKUPS
+var GOOGLE_API_KEY = "";
 
 while (DB_URL.length > 0 && DB_URL.charAt(DB_URL.length - 1) === "/") {
   DB_URL = DB_URL.slice(0, -1);
@@ -519,7 +525,7 @@ var HUBS = {
 };
 
 var CACHE = {}, BUSY = {}, MISS = {}, timer = null, pushTimer = null, isTyping = false, lastSnapshot = "", chatMessages = [], loadStatuses = {};
-try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v20") || "{}"); } catch (e) {}
+try { CACHE = JSON.parse(localStorage.getItem("uk_geo_v22") || "{}"); } catch (e) {}
 
 function miles(a, b) {
   var dLat = (b.lat - a.lat) * 0.0174533, dLon = (b.lon - a.lon) * 0.0174533;
@@ -689,28 +695,77 @@ function pullFromCloud() {
     });
 }
 
+function saveGeoCache(q, entry) {
+  CACHE[q] = entry;
+  try { localStorage.setItem("uk_geo_v22", JSON.stringify(CACHE)); } catch (e) {}
+  delete BUSY[q];
+  run();
+}
+
+function fallbackNominatim(q) {
+  var url = "https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&limit=1&q=" + encodeURIComponent(q + ", UK");
+  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
+    if (d && d.length > 0) {
+      saveGeoCache(q, [d[0].display_name.split(",")[0], parseFloat(d[0].lat), parseFloat(d[0].lon), "UK Location / Depot"]);
+    } else {
+      delete BUSY[q];
+      MISS[q] = true;
+      run();
+    }
+  }).catch(function() {
+    delete BUSY[q];
+    MISS[q] = true;
+    run();
+  });
+}
+
 function lookup(q) {
   if (!q || BUSY[q] || MISS[q] || CACHE[q]) return;
   BUSY[q] = true;
   var w = words(q);
   var isPc = (w.length === 2 && w[0].length >= 2 && w[0].length <= 4 && w[1].length === 3 && isNum(w[1].charAt(0)));
   var isOut = (w.length === 1 && w[0].length >= 2 && w[0].length <= 4 && !isNum(w[0].charAt(0)) && isNum(w[0].charAt(w[0].length - 1)));
-  var url = isPc ? ("https://api.postcodes.io/postcodes/" + encodeURIComponent(w[0] + w[1]))
-          : isOut ? ("https://api.postcodes.io/outcodes/" + encodeURIComponent(w[0]))
-          : ("https://nominatim.openstreetmap.org/search?format=json&countrycodes=gb&limit=1&q=" + encodeURIComponent(q + ", UK"));
 
-  fetch(url).then(function(r) { return r.json(); }).then(function(d) {
-    delete BUSY[q];
-    if ((isPc || isOut) && d && d.status === 200 && d.result) {
-      CACHE[q] = [d.result.postcode || d.result.outcode, d.result.latitude, d.result.longitude, d.result.region || "UK Postcode"];
-    } else if (!isPc && !isOut && d && d.length > 0) {
-      CACHE[q] = [d[0].display_name.split(",")[0], parseFloat(d[0].lat), parseFloat(d[0].lon), "UK Location"];
-    } else {
-      MISS[q] = true;
-    }
-    try { localStorage.setItem("uk_geo_v20", JSON.stringify(CACHE)); } catch (e) {}
-    run();
-  }).catch(function() { delete BUSY[q]; MISS[q] = true; run(); });
+  if (isPc || isOut) {
+    var pcUrl = isPc ? ("https://api.postcodes.io/postcodes/" + encodeURIComponent(w[0] + w[1]))
+                     : ("https://api.postcodes.io/outcodes/" + encodeURIComponent(w[0]));
+    fetch(pcUrl).then(function(r) { return r.json(); }).then(function(d) {
+      if (d && d.status === 200 && d.result) {
+        saveGeoCache(q, [d.result.postcode || d.result.outcode, d.result.latitude, d.result.longitude, d.result.region || "UK Postcode"]);
+      } else {
+        fallbackNominatim(q);
+      }
+    }).catch(function() { fallbackNominatim(q); });
+    return;
+  }
+
+  if (GOOGLE_API_KEY && GOOGLE_API_KEY.length > 10) {
+    fetch("https://places.googleapis.com/v1/places:searchText", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": GOOGLE_API_KEY,
+        "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location"
+      },
+      body: JSON.stringify({
+        textQuery: q + ", United Kingdom",
+        regionCode: "GB",
+        maxResultCount: 1
+      })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+      if (d && d.places && d.places.length > 0 && d.places[0].location) {
+        var pl = d.places[0];
+        var label = (pl.displayName && pl.displayName.text) ? pl.displayName.text : q;
+        var addr = pl.formattedAddress ? pl.formattedAddress.replace(", UK", "") : "UK Business";
+        saveGeoCache(q, [label, pl.location.latitude, pl.location.longitude, addr]);
+      } else {
+        fallbackNominatim(q);
+      }
+    }).catch(function() { fallbackNominatim(q); });
+    return;
+  }
+
+  fallbackNominatim(q);
 }
 
 function parse(text, missList, pendList) {
@@ -735,11 +790,15 @@ function parse(text, missList, pendList) {
       if (!used) rem.push(w);
     }
     if (cnt === 1 && times.length > 1) cnt = times.length;
-    var found = null;
-    for (var k in HUBS) {
-      if (pad.indexOf(" " + k + " ") !== -1 || pad.indexOf(" " + k + "s ") !== -1) { found = HUBS[k]; break; }
-    }
     var q = rem.join(" ").trim();
+    var found = null;
+
+    if (HUBS[q]) {
+      found = HUBS[q];
+    } else if (q.length > 1 && q.charAt(q.length - 1) === "s" && HUBS[q.slice(0, -1)]) {
+      found = HUBS[q.slice(0, -1)];
+    }
+
     if (!found && q && CACHE[q]) found = CACHE[q];
     if (found) {
       out.push({ name: found[0], lat: found[1], lon: found[2], reg: found[3], cnt: cnt, times: times, night: night, haz: haz });
@@ -786,12 +845,11 @@ function run() {
   hubs.sort(function(a, b) { return b.cnt - a.cnt; });
 
   var lf = String.fromCharCode(10), cr = String.fromCharCode(13);
-  var rawL = document.getElementById("loads").value.split(cr).join(lf).split(",").join(lf).split(lf);
+  var rawL = document.getElementById("loads").value.split(cr).join(lf).split(lf);
   var lArr = [];
   for (var i = 0; i < rawL.length; i++) if (rawL[i].trim()) lArr = lArr.concat(parse(rawL[i], miss, pend));
   var loads = merge(lArr);
 
-  // Auto-prune saved statuses for any loads removed from the list so future entries start clean
   if (pend.length === 0) {
     var activeNames = {};
     for (var ac = 0; ac < loads.length; ac++) activeNames[loads[ac].name] = true;
@@ -812,75 +870,29 @@ function run() {
   document.getElementById("s-hubs").textContent = hubs.length;
   document.getElementById("s-loads").textContent = lTot;
 
+  // Build Sidebar Hub Cards & Map Lookup by Location Key
+  var hubByCoord = {};
   for (var h = 0; h < hubs.length; h++) {
-    (function(hub) {
-      var p = pt(hub.lat, hub.lon);
-      var r = Math.min(13.5, 7 + hub.cnt * 1.3);
-      var col = hub.night ? "#a855f7" : (hub.times.length ? "#f59e0b" : "#38bdf8");
+    var hb = hubs[h];
+    var hKey = hb.lat.toFixed(3) + "," + hb.lon.toFixed(3);
+    hubByCoord[hKey] = hb;
 
-      var pg = document.createElementNS(ns, "g");
-      pg.setAttribute("class", "pin-node");
-      pg.setAttribute("data-x", p.x.toFixed(2));
-      pg.setAttribute("data-y", p.y.toFixed(2));
-      pg.setAttribute("filter", "url(#pinShadow)");
-
-      var halo = document.createElementNS(ns, "circle");
-      halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 4);
-      halo.setAttribute("fill", hub.haz ? "#ef4444" : col); halo.setAttribute("opacity", hub.haz ? "0.35" : "0.24");
-      pg.appendChild(halo);
-
-      var c = document.createElementNS(ns, "circle");
-      c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
-      c.setAttribute("fill", col);
-      c.setAttribute("stroke", hub.haz ? "#ef4444" : "#090f1d");
-      c.setAttribute("stroke-width", hub.haz ? "2.4" : "1.8");
-      pg.appendChild(c);
-
-      var tx = document.createElementNS(ns, "text");
-      tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
-      pg.appendChild(tx);
-
-      var hazSuffix = hub.haz ? " [HAZ]" : "";
-      var timeSuffix = hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : "");
-      var labelStr = hub.name + hazSuffix + timeSuffix;
-      var pillW = labelStr.length * 6.2 + 10;
-
-      var rect = document.createElementNS(ns, "rect");
-      rect.setAttribute("x", r + 5); rect.setAttribute("y", "-8");
-      rect.setAttribute("width", pillW); rect.setAttribute("height", "16");
-      rect.setAttribute("class", hub.haz ? "lbl-bg h" : "lbl-bg");
-      pg.appendChild(rect);
-
-      var lb = document.createElementNS(ns, "text");
-      lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5");
-      lb.setAttribute("class", hub.haz ? "lbl h" : "lbl");
-      lb.textContent = labelStr;
-      pg.appendChild(lb);
-
-      pg.onmousemove = function(e) {
-        showTip(e,
-          '<strong style="color:' + (hub.haz ? "#fca5a5" : col) + ';">' + hub.name + ' &mdash; ' + hub.cnt + ' Available' + (hub.haz ? ' (&#9763; ADR/HAZ)' : '') + '</strong>' +
-          '<div style="color:#94a3b8;margin-top:2px;">' + hub.reg + '</div>' +
-          (hub.times.length ? '<div style="color:#fbbf24;margin-top:3px;">Waves: ' + hub.times.join(", ") + '</div>' : ''),
-          hub.haz ? "#ef4444" : col
-        );
-      };
-      pg.onmouseleave = hideTip;
-
-      pins.appendChild(pg);
-
-      var card = document.createElement("div");
-      card.className = hub.haz ? "card hz" : "card";
-      var cls = hub.night ? "tag n" : (hub.times.length ? "tag t" : "tag");
-      var hazPill = hub.haz ? '<span class="tag h">&#9763; HAZ</span>' : '';
-      card.innerHTML = '<div><div class="card-title">' + hub.name + hazPill + '</div><div class="card-sub">' + (hub.times.length ? "Waves: " + hub.times.join(", ") : hub.reg) + '</div></div><span class="' + cls + '">' + hub.cnt + 'x</span>';
-      hList.appendChild(card);
-    })(hubs[h]);
+    var card = document.createElement("div");
+    card.className = hb.haz ? "card hz" : "card";
+    var cls = hb.night ? "tag n" : (hb.times.length ? "tag t" : "tag");
+    var hazPill = hb.haz ? '<span class="tag h">&#9763; HAZ</span>' : '';
+    card.innerHTML = '<div><div class="card-title">' + escHtml(hb.name) + hazPill + '</div><div class="card-sub">' + (hb.times.length ? "Waves: " + hb.times.join(", ") : escHtml(hb.reg)) + '</div></div><span class="' + cls + '">' + hb.cnt + 'x</span>';
+    hList.appendChild(card);
   }
 
+  // Build Sidebar Load Cards & Map Lookup by Location Key
+  var loadByCoord = {};
   document.getElementById("hdr-loads").style.display = loads.length ? "flex" : "none";
   for (var l = 0; l < loads.length; l++) {
     (function(ld) {
+      var lKey = ld.lat.toFixed(3) + "," + ld.lon.toFixed(3);
+      loadByCoord[lKey] = ld;
+
       var st = loadStatuses[ld.name] || "";
       var isNo = (st === "no");
       var isOk = (st === "ok");
@@ -900,8 +912,11 @@ function run() {
       }
       near.sort(function(x, y) { return x.mi - y.mi; });
       near = near.slice(0, 3);
+      ld._near = near;
 
       for (var m = 0; m < near.length; m++) {
+        // Skip drawing line if distance is 0 miles (same location — shown as Split Pin!)
+        if (near[m].mi === 0) continue;
         var hp = pt(near[m].lat, near[m].lon), ln = document.createElementNS(ns, "line");
         var baseW = m === 0 ? "2.1" : "1.1";
         ln.setAttribute("class", "conn-line");
@@ -913,51 +928,6 @@ function run() {
         ln.setAttribute("opacity", isNo ? "0.22" : (m === 0 ? "0.92" : "0.4"));
         lines.appendChild(ln);
       }
-
-      var lg = document.createElementNS(ns, "g");
-      lg.setAttribute("class", "pin-node");
-      lg.setAttribute("data-x", lp.x.toFixed(2));
-      lg.setAttribute("data-y", lp.y.toFixed(2));
-      lg.setAttribute("filter", "url(#pinShadow)");
-      if (isNo) lg.setAttribute("opacity", "0.65");
-
-      var sz = ld.haz ? 11 : 9.5, poly = document.createElementNS(ns, "polygon");
-      poly.setAttribute("points", "0," + (-sz) + " " + sz + ",0 0," + sz + " " + (-sz) + ",0");
-      poly.setAttribute("fill", col);
-      poly.setAttribute("stroke", isOk ? "#34d399" : (ld.haz ? "#fbbf24" : "#ffffff"));
-      poly.setAttribute("stroke-width", isOk ? "2.4" : "1.8");
-      lg.appendChild(poly);
-
-      var ltx = document.createElementNS(ns, "text");
-      ltx.setAttribute("x", "0"); ltx.setAttribute("y", "0"); ltx.setAttribute("class", "cnt");
-      if (ld.haz || isNo) ltx.setAttribute("fill", "#ffffff");
-      ltx.textContent = isNo ? "\u2715" : (isOk ? "\u2713" : ld.cnt);
-      lg.appendChild(ltx);
-
-      var prefix = isNo ? "NO COVER: " : (isOk ? "BOOKED: " : (ld.haz ? "HAZ: " : "LOAD: "));
-      var lStr = prefix + ld.name;
-      var lPillW = lStr.length * 6.4 + 10;
-      var lRect = document.createElementNS(ns, "rect");
-      lRect.setAttribute("x", sz + 5); lRect.setAttribute("y", "-8");
-      lRect.setAttribute("width", lPillW); lRect.setAttribute("height", "16");
-      lRect.setAttribute("class", (ld.haz || isNo) ? "lbl-bg h" : "lbl-bg g");
-      lg.appendChild(lRect);
-
-      var llb = document.createElementNS(ns, "text");
-      llb.setAttribute("x", sz + 10); llb.setAttribute("y", "3.5");
-      llb.setAttribute("class", (ld.haz || isNo) ? "lbl h" : "lbl g");
-      llb.textContent = lStr;
-      lg.appendChild(llb);
-
-      var nearHtml = near.length ? near.map(function(n) { return n.name + (n.haz ? " [HAZ]" : "") + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
-      var statusNote = isNo ? '<div style="color:#f87171;font-weight:700;margin-top:2px;">&#10005; Marked Cannot Cover</div>'
-                     : isOk ? '<div style="color:#34d399;font-weight:700;margin-top:2px;">&#10003; Confirmed &amp; Booked</div>' : '';
-      lg.onmousemove = function(e) {
-        showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + ld.name + ' (' + ld.cnt + 'x)</strong>' + statusNote + '<div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
-      };
-      lg.onmouseleave = hideTip;
-
-      pins.appendChild(lg);
 
       var card = document.createElement("div");
       card.className = "card ld" + (ld.haz && !isNo && !isOk ? " hz" : "") + (isNo ? " uncovered" : "") + (isOk ? " booked" : "");
@@ -997,6 +967,219 @@ function run() {
     })(loads[l]);
   }
 
+  // Render Map Pins — automatically splitting any pin that has BOTH Fleet Availability and an Offered Load!
+  var allKeys = {};
+  for (var hk in hubByCoord) allKeys[hk] = true;
+  for (var lk in loadByCoord) allKeys[lk] = true;
+
+  for (var key in allKeys) {
+    (function(hub, ld) {
+      // CASE 1: SPLIT PIN (Both Fleet Availability AND Load Offer at exact same coordinates)
+      if (hub && ld) {
+        var p = pt(hub.lat, hub.lon);
+        var r = 13.5;
+        var st = loadStatuses[ld.name] || "";
+        var isNo = (st === "no"), isOk = (st === "ok");
+
+        var hubCol = hub.night ? "#a855f7" : (hub.times.length ? "#f59e0b" : "#38bdf8");
+        var loadCol = isNo ? "#ef4444" : (ld.haz ? "#ef4444" : "#10b981");
+
+        var pg = document.createElementNS(ns, "g");
+        pg.setAttribute("class", "pin-node");
+        pg.setAttribute("data-x", p.x.toFixed(2));
+        pg.setAttribute("data-y", p.y.toFixed(2));
+        pg.setAttribute("filter", "url(#pinShadow)");
+
+        // Outer subtle dual-halo
+        var halo = document.createElementNS(ns, "circle");
+        halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 4);
+        halo.setAttribute("fill", hubCol); halo.setAttribute("opacity", "0.22");
+        pg.appendChild(halo);
+
+        // Left Semicircle (Available Fleet)
+        var leftArc = document.createElementNS(ns, "path");
+        leftArc.setAttribute("d", "M 0," + (-r) + " A " + r + "," + r + " 0 0,0 0," + r + " Z");
+        leftArc.setAttribute("fill", hubCol);
+        pg.appendChild(leftArc);
+
+        // Right Semicircle (Offered Load)
+        var rightArc = document.createElementNS(ns, "path");
+        rightArc.setAttribute("d", "M 0," + (-r) + " A " + r + "," + r + " 0 0,1 0," + r + " Z");
+        rightArc.setAttribute("fill", loadCol);
+        if (isNo) rightArc.setAttribute("opacity", "0.75");
+        pg.appendChild(rightArc);
+
+        // Crisp Outer Border & Center Divider Line
+        var ring = document.createElementNS(ns, "circle");
+        ring.setAttribute("cx", "0"); ring.setAttribute("cy", "0"); ring.setAttribute("r", r);
+        ring.setAttribute("fill", "none");
+        ring.setAttribute("stroke", (hub.haz || ld.haz) ? "#fbbf24" : "#090f1d");
+        ring.setAttribute("stroke-width", "1.8");
+        pg.appendChild(ring);
+
+        var divLine = document.createElementNS(ns, "line");
+        divLine.setAttribute("x1", "0"); divLine.setAttribute("y1", -r);
+        divLine.setAttribute("x2", "0"); divLine.setAttribute("y2", r);
+        divLine.setAttribute("stroke", "#090f1d");
+        divLine.setAttribute("stroke-width", "1.6");
+        pg.appendChild(divLine);
+
+        // Left Count (Fleet Available)
+        var tLeft = document.createElementNS(ns, "text");
+        tLeft.setAttribute("x", (-r * 0.48).toFixed(1)); tLeft.setAttribute("y", "0");
+        tLeft.setAttribute("class", "cnt-sm");
+        tLeft.textContent = hub.cnt;
+        pg.appendChild(tLeft);
+
+        // Right Count / Status (Load Offer)
+        var tRight = document.createElementNS(ns, "text");
+        tRight.setAttribute("x", (r * 0.48).toFixed(1)); tRight.setAttribute("y", "0");
+        tRight.setAttribute("class", "cnt-sm");
+        if (ld.haz || isNo) tRight.setAttribute("fill", "#ffffff");
+        tRight.textContent = isNo ? "\u2715" : (isOk ? "\u2713" : ld.cnt);
+        pg.appendChild(tRight);
+
+        // Combined Pill Label showing both Fleet & Load clearly
+        var loadTag = isNo ? "NO COVER" : (isOk ? "BOOKED" : (ld.haz ? ld.cnt + " HAZ" : ld.cnt + " Load"));
+        var labelStr = hub.name + " (" + hub.cnt + " Avail | " + loadTag + ")";
+        var pillW = labelStr.length * 6.0 + 12;
+
+        var rect = document.createElementNS(ns, "rect");
+        rect.setAttribute("x", r + 5); rect.setAttribute("y", "-8");
+        rect.setAttribute("width", pillW); rect.setAttribute("height", "16");
+        rect.setAttribute("class", (hub.haz || ld.haz || isNo) ? "lbl-bg h" : "lbl-bg split");
+        pg.appendChild(rect);
+
+        var lb = document.createElementNS(ns, "text");
+        lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5");
+        lb.setAttribute("class", "lbl");
+        lb.textContent = labelStr;
+        pg.appendChild(lb);
+
+        pg.onmousemove = function(e) {
+          var tipHtml = '<strong style="color:#38bdf8;">' + escHtml(hub.name) + ' (Split Location)</strong>' +
+            '<div style="color:#7dd3fc;margin-top:3px;">&#9679; Fleet Available: <b>' + hub.cnt + 'x</b>' + (hub.haz ? ' [HAZ]' : '') + (hub.times.length ? ' (' + hub.times.join(", ") + ')' : '') + '</div>' +
+            '<div style="color:' + (isNo ? '#f87171' : '#6ee7b7') + ';margin-top:2px;">&#9670; Offered Load: <b>' + ld.cnt + 'x</b>' + (ld.haz ? ' [HAZ]' : '') + (isOk ? ' &mdash; BOOKED &#10003;' : (isNo ? ' &mdash; NO COVER &#10005;' : '')) + '</div>';
+          showTip(e, tipHtml, "#38bdf8");
+        };
+        pg.onmouseleave = hideTip;
+        pins.appendChild(pg);
+        return;
+      }
+
+      // CASE 2: FLEET ONLY PIN
+      if (hub) {
+        var p = pt(hub.lat, hub.lon);
+        var r = Math.min(13.5, 7 + hub.cnt * 1.3);
+        var col = hub.night ? "#a855f7" : (hub.times.length ? "#f59e0b" : "#38bdf8");
+
+        var pg = document.createElementNS(ns, "g");
+        pg.setAttribute("class", "pin-node");
+        pg.setAttribute("data-x", p.x.toFixed(2));
+        pg.setAttribute("data-y", p.y.toFixed(2));
+        pg.setAttribute("filter", "url(#pinShadow)");
+
+        var halo = document.createElementNS(ns, "circle");
+        halo.setAttribute("cx", "0"); halo.setAttribute("cy", "0"); halo.setAttribute("r", r + 4);
+        halo.setAttribute("fill", hub.haz ? "#ef4444" : col); halo.setAttribute("opacity", hub.haz ? "0.35" : "0.24");
+        pg.appendChild(halo);
+
+        var c = document.createElementNS(ns, "circle");
+        c.setAttribute("cx", "0"); c.setAttribute("cy", "0"); c.setAttribute("r", r);
+        c.setAttribute("fill", col);
+        c.setAttribute("stroke", hub.haz ? "#ef4444" : "#090f1d");
+        c.setAttribute("stroke-width", hub.haz ? "2.4" : "1.8");
+        pg.appendChild(c);
+
+        var tx = document.createElementNS(ns, "text");
+        tx.setAttribute("x", "0"); tx.setAttribute("y", "0"); tx.setAttribute("class", "cnt"); tx.textContent = hub.cnt;
+        pg.appendChild(tx);
+
+        var hazSuffix = hub.haz ? " [HAZ]" : "";
+        var timeSuffix = hub.times.length ? " (" + hub.times.join(", ") + ")" : (hub.night ? " (Night)" : "");
+        var labelStr = hub.name + hazSuffix + timeSuffix;
+        var pillW = labelStr.length * 6.2 + 10;
+
+        var rect = document.createElementNS(ns, "rect");
+        rect.setAttribute("x", r + 5); rect.setAttribute("y", "-8");
+        rect.setAttribute("width", pillW); rect.setAttribute("height", "16");
+        rect.setAttribute("class", hub.haz ? "lbl-bg h" : "lbl-bg");
+        pg.appendChild(rect);
+
+        var lb = document.createElementNS(ns, "text");
+        lb.setAttribute("x", r + 10); lb.setAttribute("y", "3.5");
+        lb.setAttribute("class", hub.haz ? "lbl h" : "lbl");
+        lb.textContent = labelStr;
+        pg.appendChild(lb);
+
+        pg.onmousemove = function(e) {
+          showTip(e,
+            '<strong style="color:' + (hub.haz ? "#fca5a5" : col) + ';">' + escHtml(hub.name) + ' &mdash; ' + hub.cnt + ' Available' + (hub.haz ? ' (&#9763; ADR/HAZ)' : '') + '</strong>' +
+            '<div style="color:#94a3b8;margin-top:2px;">' + escHtml(hub.reg) + '</div>' +
+            (hub.times.length ? '<div style="color:#fbbf24;margin-top:3px;">Waves: ' + hub.times.join(", ") + '</div>' : ''),
+            hub.haz ? "#ef4444" : col
+          );
+        };
+        pg.onmouseleave = hideTip;
+        pins.appendChild(pg);
+        return;
+      }
+
+      // CASE 3: LOAD ONLY PIN
+      if (ld) {
+        var st = loadStatuses[ld.name] || "";
+        var isNo = (st === "no"), isOk = (st === "ok");
+        var lp = pt(ld.lat, ld.lon);
+        var col = isNo ? "#ef4444" : (ld.haz ? "#ef4444" : "#10b981");
+
+        var lg = document.createElementNS(ns, "g");
+        lg.setAttribute("class", "pin-node");
+        lg.setAttribute("data-x", lp.x.toFixed(2));
+        lg.setAttribute("data-y", lp.y.toFixed(2));
+        lg.setAttribute("filter", "url(#pinShadow)");
+        if (isNo) lg.setAttribute("opacity", "0.65");
+
+        var sz = ld.haz ? 11 : 9.5, poly = document.createElementNS(ns, "polygon");
+        poly.setAttribute("points", "0," + (-sz) + " " + sz + ",0 0," + sz + " " + (-sz) + ",0");
+        poly.setAttribute("fill", col);
+        poly.setAttribute("stroke", isOk ? "#34d399" : (ld.haz ? "#fbbf24" : "#ffffff"));
+        poly.setAttribute("stroke-width", isOk ? "2.4" : "1.8");
+        lg.appendChild(poly);
+
+        var ltx = document.createElementNS(ns, "text");
+        ltx.setAttribute("x", "0"); ltx.setAttribute("y", "0"); ltx.setAttribute("class", "cnt");
+        if (ld.haz || isNo) ltx.setAttribute("fill", "#ffffff");
+        ltx.textContent = isNo ? "\u2715" : (isOk ? "\u2713" : ld.cnt);
+        lg.appendChild(ltx);
+
+        var prefix = isNo ? "NO COVER: " : (isOk ? "BOOKED: " : (ld.haz ? "HAZ: " : "LOAD: "));
+        var lStr = prefix + ld.name;
+        var lPillW = lStr.length * 6.4 + 10;
+        var lRect = document.createElementNS(ns, "rect");
+        lRect.setAttribute("x", sz + 5); lRect.setAttribute("y", "-8");
+        lRect.setAttribute("width", lPillW); lRect.setAttribute("height", "16");
+        lRect.setAttribute("class", (ld.haz || isNo) ? "lbl-bg h" : "lbl-bg g");
+        lg.appendChild(lRect);
+
+        var llb = document.createElementNS(ns, "text");
+        llb.setAttribute("x", sz + 10); llb.setAttribute("y", "3.5");
+        llb.setAttribute("class", (ld.haz || isNo) ? "lbl h" : "lbl g");
+        llb.textContent = lStr;
+        lg.appendChild(llb);
+
+        var near = ld._near || [];
+        var nearHtml = near.length ? near.map(function(n) { return n.name + (n.haz ? " [HAZ]" : "") + " (" + n.cnt + "x, ~" + n.mi + " mi)"; }).join("<br>") : "No fleet available";
+        var statusNote = isNo ? '<div style="color:#f87171;font-weight:700;margin-top:2px;">&#10005; Marked Cannot Cover</div>'
+                       : isOk ? '<div style="color:#34d399;font-weight:700;margin-top:2px;">&#10003; Confirmed &amp; Booked</div>' : '';
+        lg.onmousemove = function(e) {
+          showTip(e, '<strong style="color:' + col + ';">' + (ld.haz ? "&#9763; HAZARDOUS LOAD" : "OFFERED LOAD") + ': ' + escHtml(ld.name) + ' (' + ld.cnt + 'x)</strong><div style="color:#94a3b8;font-size:11px;margin-top:2px;">' + escHtml(ld.reg) + '</div>' + statusNote + '<div style="color:#cbd5e1;font-size:11px;margin-top:4px;">' + nearHtml + '</div>', col);
+        };
+        lg.onmouseleave = hideTip;
+        pins.appendChild(lg);
+      }
+    })(hubByCoord[key], loadByCoord[key]);
+  }
+
   applyTransform();
 
   var msg = document.getElementById("msg");
@@ -1016,4 +1199,3 @@ setInterval(pullFromCloud, 2500);
 </script>
 </body>
 </html>
-
